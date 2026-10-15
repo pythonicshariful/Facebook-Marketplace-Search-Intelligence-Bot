@@ -6,23 +6,24 @@ A production-grade Python application for 24/7 automated monitoring of Facebook 
 
 ## 📑 Table of Contents
 
-1. [Features & Capabilities](#-features--capabilities)
-2. [System Requirements](#-system-requirements)
-3. [Installation Guide](#-installation-guide)
-4. [How to Run the Bot](#-how-to-run-the-bot)
-5. [Quick-Start Tutorial (Step-by-Step)](#-quick-start-tutorial-step-by-step)
-   - [Step 1: Sign in to Facebook Profile](#step-1-connect--sign-in-to-your-facebook-profile)
-   - [Step 2: Configure Telegram Alerts](#step-2-configure-telegram-push-notifications)
-   - [Step 3: Activate Vehicle Search Presets](#step-3-load-or-create-vehicle-search-presets)
-   - [Step 4: View Results & Receive Alerts](#step-4-view-live-leads--receive-telegram-alerts)
-6. [Dashboard UI Control Guide](#-dashboard-ui-control-guide)
-7. [Testing & Verification](#-testing--verification)
-8. [24/7 Windows RDP / VPS Deployment](#-247-windows-rdp--vps-deployment)
-9. [Configuration & Customization (.env)](#-configuration--customization)
-10. [Troubleshooting & FAQ](#-troubleshooting--faq)
+1. [Features & Capabilities](#features)
+2. [System Requirements](#system-requirements)
+3. [Installation Guide](#installation-guide)
+4. [How to Run the Bot](#how-to-run)
+5. [Quick-Start Tutorial (Step-by-Step)](#quick-start)
+   - [Step 1: Sign in to Facebook Profile](#step-1-login)
+   - [Step 2: Configure Telegram Alerts](#step-2-telegram)
+   - [Step 3: Activate Vehicle Search Presets](#step-3-presets)
+   - [Step 4: View Results & Receive Alerts](#step-4-monitoring)
+6. [Dashboard UI Control Guide](#dashboard-ui)
+7. [Testing & Verification](#testing)
+8. [24/7 Windows RDP / VPS Deployment](#deployment)
+9. [Configuration & Customization (.env)](#configuration)
+10. [Troubleshooting & FAQ](#troubleshooting)
 
 ---
 
+<a id="features"></a>
 ## 🌟 Features & Capabilities
 
 - **🖥️ Easy & Modern Web Dashboard:** Sleek, responsive dark-glass UI with 8 dedicated control panels. No command-line commands required for daily operation.
@@ -42,6 +43,7 @@ A production-grade Python application for 24/7 automated monitoring of Facebook 
 
 ---
 
+<a id="system-requirements"></a>
 ## 💻 System Requirements
 
 - **Operating System:** Windows 10, Windows 11, or Windows Server 2016/2019/2022 (RDP/VPS compatible).
@@ -51,6 +53,7 @@ A production-grade Python application for 24/7 automated monitoring of Facebook 
 
 ---
 
+<a id="installation-guide"></a>
 ## 📦 Installation Guide
 
 ### Option A: Automatic 1-Click Setup (Recommended)
@@ -86,6 +89,7 @@ A production-grade Python application for 24/7 automated monitoring of Facebook 
 
 ---
 
+<a id="how-to-run"></a>
 ## 🚀 How to Run the Bot
 
 ### 1. Start the Server
@@ -121,10 +125,12 @@ Default login credentials:
 
 ---
 
+<a id="quick-start"></a>
 ## 📖 Quick-Start Tutorial (Step-by-Step)
 
 Follow these 4 simple steps to have the bot monitoring and alerting you within 5 minutes:
 
+<a id="step-1-login"></a>
 ### Step 1: Connect & Sign in to your Facebook Profile
 1. In the left sidebar, click **👥 Account Manager**.
 2. Click **+ Add Account**:
@@ -138,6 +144,7 @@ Follow these 4 simple steps to have the bot monitoring and alerting you within 5
 
 ---
 
+<a id="step-2-telegram"></a>
 ### Step 2: Configure Telegram Push Notifications
 1. In the sidebar, click **✈️ Telegram Settings**.
 2. Check the box **Enable Telegram Push Notifications**.
@@ -150,6 +157,7 @@ Follow these 4 simple steps to have the bot monitoring and alerting you within 5
 
 ---
 
+<a id="step-3-presets"></a>
 ### Step 3: Load or Create Vehicle Search Presets
 1. In the sidebar, click **🔍 Search Manager**.
 2. To load pre-configured searches instantly, click:
@@ -162,6 +170,7 @@ Follow these 4 simple steps to have the bot monitoring and alerting you within 5
 
 ---
 
+<a id="step-4-monitoring"></a>
 ### Step 4: View Live Leads & Receive Telegram Alerts
 1. In **Search Manager**, click **▶ Run** on any search to trigger a test cycle immediately.
 2. In the sidebar, click **📡 Live Monitoring** to watch the background cycle execute in real time:
@@ -173,6 +182,7 @@ Follow these 4 simple steps to have the bot monitoring and alerting you within 5
 
 ---
 
+<a id="dashboard-ui"></a>
 ## 🎛️ Dashboard UI Control Guide
 
 The dashboard is structured into 8 intuitive sections accessible from the sidebar:
@@ -190,6 +200,7 @@ The dashboard is structured into 8 intuitive sections accessible from the sideba
 
 ---
 
+<a id="testing"></a>
 ## 🧪 Testing & Verification
 
 ### 1. Automated Test Suite (16/16 Unit Tests)
@@ -211,6 +222,7 @@ Or in PowerShell:
 
 ---
 
+<a id="deployment"></a>
 ## 🖥️ 24/7 Windows RDP / VPS Deployment
 
 When running on a Windows VPS or Remote Desktop (RDP), Chrome automation requires an active interactive GUI desktop. If you close your Remote Desktop connection normally, Windows disconnects the GUI session, which can suspend browser rendering.
@@ -238,6 +250,7 @@ To ensure the bot automatically starts whenever the Windows server boots or rebo
 
 ---
 
+<a id="configuration"></a>
 ## ⚙️ Configuration & Customization
 
 The bot loads default environment variables from `.env`. You can customize them directly or edit them within the web dashboard under **Application Settings**:
@@ -267,6 +280,7 @@ FMBOT_TELEGRAM_CHAT_ID=7809021498
 
 ---
 
+<a id="troubleshooting"></a>
 ## ❓ Troubleshooting & FAQ
 
 ### 1. "Chrome failed to start" or "Profile is locked"
@@ -301,5 +315,3 @@ FMBOT_TELEGRAM_CHAT_ID=7809021498
 
 **Developed for Facebook Marketplace Search Intelligence.**  
 *Happy vehicle hunting!* 🚗💨
-#   F a c e b o o k - M a r k e t p l a c e - S e a r c h - I n t e l l i g e n c e - B o t  
- 
