@@ -9,7 +9,10 @@
       Configure vehicle search criteria, damage/condition filters, scheduling intervals, and account assignments.
     </p>
   </div>
-  <div>
+  <div style="display:flex; gap:0.5rem; align-items:center;">
+    <button type="button" class="btn btn-outline" onclick="postAction('{{ url_for('searches.seed_presets') }}')">
+      ⚡ Load Default Presets
+    </button>
     <a href="{{ url_for('searches.create') }}" class="btn btn-primary">+ Create New Search</a>
   </div>
 </div>
@@ -177,8 +180,16 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">
-            No searches created yet. Click <strong>+ Create New Search</strong> to start monitoring Facebook Marketplace!
+          <td colspan="9" style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
+            <div style="font-size:1.8rem; margin-bottom:0.5rem;">🔍</div>
+            <div style="font-size:1.05rem; color:#fff; font-weight:600; margin-bottom:0.35rem;">No searches created yet</div>
+            <p style="margin:0 0 1.25rem 0; font-size:0.875rem;">Get started immediately by loading default vehicle condition presets or creating a custom search.</p>
+            <div style="display:inline-flex; gap:0.75rem;">
+              <button type="button" class="btn btn-primary" onclick="postAction('{{ url_for('searches.seed_presets') }}')">
+                ⚡ Load Default Vehicle Presets
+              </button>
+              <a href="{{ url_for('searches.create') }}" class="btn btn-outline">+ Custom Search</a>
+            </div>
           </td>
         </tr>
         {% endfor %}

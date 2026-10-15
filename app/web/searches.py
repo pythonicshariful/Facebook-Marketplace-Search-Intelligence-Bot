@@ -154,8 +154,57 @@ def run_now(search_id: int):
         ok = scheduler.trigger_search_now(search_id)
         if ok:
             flash("Search execution triggered immediately in background.", "success")
-        else:
-            flash("Search is already currently running.", "warning")
-    else:
-        flash("Scheduler is not active.", "danger")
     return redirect(url_for("searches.index"))
+
+
+@bp.route("/seed-presets", methods=["POST"])
+@login_required
+def seed_presets():
+    preset_configs = [
+        {
+            "name": "Damaged Cars Under $3,000",
+            "search_terms": "damaged car",
+            "vehicle_condition": "damaged",
+            "min_price": 100,
+            "max_price": 3000,
+            "interval_minutes": 10,
+            "account": "auto",
+            "notify_telegram": True,
+            "status": "active",
+        },
+        {
+            "name": "Blown Engine & Non-Running",
+            "search_terms": "blown engine",
+            "vehicle_condition": "blown_engine",
+            "min_price": 100,
+            "max_price": 2500,
+            "interval_minutes": 10,
+            "account": "auto",
+            "notify_telegram": True,
+            "status": "active",
+        },
+        {
+            "name": "Mechanic Special & Repairable",
+            "search_terms": "mechanic special",
+            "vehicle_condition": "repairable",
+            "min_price": 100,
+            "max_price": 3500,
+            "interval_minutes": 10,
+            "account": "auto",
+            "notify_telegram": True,
+            "status": "active",
+        },
+    ]
+
+    count = 0
+    for data in preset_configs:
+        try:
+            search_service.create(db, data)
+            count += 1
+        except Exception:
+            pass
+
+    db.commit()
+    flash(f"Successfully loaded {count} default vehicle search presets!", "success")
+    return redirect(url_for("searches.index"))
+
