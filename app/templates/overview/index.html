@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}System Overview{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+  <div>
+    <h1 class="page-title">System Overview</h1>
+    <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">Real-time statistics and monitoring health</p>
+  </div>
+  <div>
+    <a href="{{ url_for('searches.create') }}" class="btn btn-primary">+ New Search</a>
+    <a href="{{ url_for('accounts.index') }}" class="btn btn-outline">Manage Accounts</a>
+  </div>
+</div>
+
+<!-- Primary Stats Grid -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <span class="stat-label">Facebook Accounts</span>
+    <span class="stat-value">{{ available_accounts }} <span style="font-size:1.1rem; color:var(--text-muted); font-weight:normal;">/ {{ total_accounts }}</span></span>
+    <span class="stat-subtext" style="color: {% if available_accounts > 0 %}#34d399{% else %}#f87171{% endif %};">
+      {{ available_accounts }} session ready{% if attention_accounts > 0 %}, <span style="color:#f87171;">{{ attention_accounts }} needs attention</span>{% endif %}
+    </span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-label">Active Searches</span>
+    <span class="stat-value">{{ active_searches }} <span style="font-size:1.1rem; color:var(--text-muted); font-weight:normal;">/ {{ total_searches }}</span></span>
+    <span class="stat-subtext" style="color: var(--text-muted);">
+      {{ paused_searches }} paused, {{ waiting_searches }} waiting, {{ failed_searches }} failed
+    </span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-label">Listings Discovered</span>
+    <span class="stat-value">{{ total_listings }}</span>
+    <span class="stat-subtext" style="color: #38bdf8;">
+      +{{ new_today }} detected today
+    </span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-label">Telegram Alerts</span>
+    <span class="stat-value">
+      {% if tg_enabled and tg_configured %}
+        <span style="color: #34d399; font-size:1.5rem;">Active</span>
+      {% elif tg_configured %}
+        <span style="color: #fbbf24; font-size:1.5rem;">Disabled</span>
+      {% else %}
+        <span style="color: #f87171; font-size:1.5rem;">Not Configured</span>
+      {% endif %}
+    </span>
+    <span class="stat-subtext">
+      <a href="{{ url_for('telegram.index') }}" style="color: #60a5fa; text-decoration:none;">Configure channel →</a>
+    </span>
+  </div>
+</div>
+
+<!-- Active Running Searches Alert (if any) -->
+{% if running_searches %}
+<div class="card" style="border-left: 4px solid #3b82f6;">
+  <h3 style="margin-top:0; font-size:1.1rem; display:flex; align-items:center; gap:0.5rem;">
+    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse 1.5s infinite;"></span>
+    Currently Running Monitoring Jobs ({{ running_searches|length }})
+  </h3>
+  <div style="display:flex; flex-wrap:wrap; gap:0.75rem;">
+    {% for s in running_searches %}
+      <span class="badge badge-info" style="font-size:0.85rem; padding:0.4rem 0.8rem;">
+        🔍 {{ s.name }} (Interval: {{ s.interval_minutes }}m)
+      </span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Two Column Layout: Recent Executions & Recent Errors -->
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+  <!-- Recent Executions -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h3 style="margin:0; font-size:1.15rem;">Recent Search Executions</h3>
+      <a href="{{ url_for('monitoring.index') }}" style="color:#60a5fa; font-size:0.85rem; text-decoration:none;">View all →</a>
+    </div>
+
+    {% if recent_executions %}
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Search</th>
+            <th>Account</th>
+            <th>Status</th>
+            <th>Results</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ex in recent_executions %}
+          <tr>
+            <td>
+              <strong>{{ ex.search.name if ex.search else 'Deleted Search' }}</strong>
+            </td>
+            <td>{{ ex.account.display_name if ex.account else '—' }}</td>
+            <td>
+              {% if ex.status == 'success' %}
+                <span class="badge badge-ready">Success</span>
+              {% elif ex.status == 'running' %}
+                <span class="badge badge-info">Running</span>
+              {% elif ex.status == 'blocked' %}
+                <span class="badge badge-error">Blocked</span>
+              {% elif ex.status == 'waiting_account' %}
+                <span class="badge badge-waiting">Waiting</span>
+              {% else %}
+                <span class="badge badge-error">{{ ex.status }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span title="Found / Matched / New">
+                {{ ex.found_count }} / <strong style="color:#34d399;">{{ ex.matched_count }}</strong> / +{{ ex.new_count }}
+              </span>
+            </td>
+            <td style="color:var(--text-muted); font-size:0.8rem;">
+              {{ ex.started_at|format_dt }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p style="color:var(--text-muted); font-size:0.9rem; text-align:center; padding:1.5rem 0;">No search cycles recorded yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Recent Application Errors / Alerts -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h3 style="margin:0; font-size:1.15rem;">Recent System & Access Warnings</h3>
+      <a href="{{ url_for('logs.index') }}" style="color:#60a5fa; font-size:0.85rem; text-decoration:none;">All logs →</a>
+    </div>
+
+    {% if recent_errors %}
+    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+      {% for err in recent_errors %}
+      <div style="padding:0.75rem; border-radius:0.5rem; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color);">
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+          <span class="badge {% if err.level == 'ERROR' %}badge-error{% else %}badge-waiting{% endif %}">
+            {{ err.level }} [{{ err.category }}]
+          </span>
+          <span style="font-size:0.75rem; color:var(--text-muted);">{{ err.created_at|format_dt('%H:%M:%S') }}</span>
+        </div>
+        <div style="font-size:0.85rem; color:#e2e8f0; line-height:1.4;">
+          {{ err.message }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div style="text-align:center; padding:2rem 0; color: #34d399;">
+        <span style="font-size:1.5rem;">✓</span>
+        <p style="margin:0.5rem 0 0 0; font-size:0.9rem;">No application errors or access warnings reported.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

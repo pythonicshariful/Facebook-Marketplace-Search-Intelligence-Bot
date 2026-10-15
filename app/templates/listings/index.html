@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Matched Listings{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+  <div>
+    <h1 class="page-title">Matched Listings</h1>
+    <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+      Discovered vehicles matching configured criteria and condition filters.
+    </p>
+  </div>
+  <div style="font-size:0.9rem; color:var(--text-muted);">
+    Total listings matching filter: <strong style="color:#fff;">{{ total_count }}</strong>
+  </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card" style="padding:1rem 1.25rem;">
+  <form method="GET" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end;">
+    <div style="flex-grow:1; min-width:200px;">
+      <label class="form-label" for="q">Keyword Search</label>
+      <input type="text" id="q" name="q" class="form-control" value="{{ q }}" placeholder="Search title, description, location...">
+    </div>
+
+    <div style="min-width:220px;">
+      <label class="form-label" for="search_id">Filter by Search</label>
+      <select id="search_id" name="search_id" class="form-control">
+        <option value="">All Searches</option>
+        {% for s in all_searches %}
+          <option value="{{ s.id }}" {% if current_search_id == s.id %}selected{% endif %}>
+            {{ s.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-bottom:0.75rem;">
+        <input type="checkbox" name="matched" value="1" {% if matched_only %}checked{% endif %}>
+        <span style="font-size:0.875rem;">Matched only</span>
+      </label>
+    </div>
+
+    <div style="display:flex; gap:0.5rem;">
+      <button type="submit" class="btn btn-primary">Filter</button>
+      <a href="{{ url_for('listings.index') }}" class="btn btn-outline">Reset</a>
+    </div>
+  </form>
+</div>
+
+<!-- Listings Cards Grid -->
+{% if listings %}
+<div class="listing-grid">
+  {% for item in listings %}
+  <div class="listing-card">
+    {% if item.image_url %}
+      <img src="{{ item.image_url }}" alt="{{ item.title }}" class="listing-thumb" loading="lazy" onerror="this.src='https://placehold.co/400x250/1e293b/94a3b8?text=Vehicle+Listing';">
+    {% else %}
+      <div class="listing-thumb" style="display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:2rem;">
+        🚗
+      </div>
+    {% endif %}
+
+    <div class="listing-body">
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <span class="listing-price">{{ item.price_cents|format_price }}</span>
+        {% if item.price_text and item.price_text != (item.price_cents|format_price) %}
+          <span style="font-size:0.75rem; color:var(--text-muted);">{{ item.price_text }}</span>
+        {% endif %}
+      </div>
+
+      <div class="listing-title" title="{{ item.title }}">
+        {{ item.title or 'Untitled Listing' }}
+      </div>
+
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+        📍 {{ item.location or 'Location not specified' }}
+        {% if item.mileage %}• {{ item.mileage }}{% endif %}
+      </div>
+
+      <!-- Match reasons if any -->
+      {% if item.search_links %}
+        <div style="display:flex; flex-wrap:wrap; gap:0.25rem; margin-bottom:0.75rem;">
+          {% for link in item.search_links %}
+            {% if link.matched %}
+              <span class="badge badge-info" style="font-size:0.7rem;" title="{{ link.match_reason }}">
+                {{ link.search.name if link.search else 'Search' }}
+              </span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div style="margin-top:auto; display:flex; justify-content:space-between; align-items:center; padding-top:0.75rem; border-top:1px solid var(--border-color); font-size:0.75rem; color:var(--text-muted);">
+        <span>Detected {{ item.first_seen_at|format_dt('%b %d, %H:%M') }}</span>
+        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+          Open FB ↗
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Pagination controls -->
+{% if total_pages > 1 %}
+<div style="display:flex; justify-content:center; gap:0.5rem; margin-top:2rem;">
+  {% if page > 1 %}
+    <a href="{{ url_for('listings.index', page=page-1, q=q, search_id=current_search_id, matched='1' if matched_only else '0') }}" class="btn btn-outline btn-sm">
+      ← Previous
+    </a>
+  {% endif %}
+  <span style="display:inline-flex; align-items:center; padding:0 1rem; font-size:0.85rem; color:var(--text-muted);">
+    Page {{ page }} of {{ total_pages }}
+  </span>
+  {% if page < total_pages %}
+    <a href="{{ url_for('listings.index', page=page+1, q=q, search_id=current_search_id, matched='1' if matched_only else '0') }}" class="btn btn-outline btn-sm">
+      Next →
+    </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="text-align:center; padding:3rem 1rem;">
+  <span style="font-size:2.5rem;">🔍</span>
+  <h3 style="margin:0.5rem 0 0.25rem 0;">No matching listings found</h3>
+  <p style="color:var(--text-muted); font-size:0.9rem; margin:0;">
+    Try modifying your keyword search or ensure your active monitoring searches are finding vehicles.
+  </p>
+</div>
+{% endif %}
+{% endblock %}

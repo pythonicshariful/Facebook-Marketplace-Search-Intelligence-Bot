@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Telegram Settings{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+  <div>
+    <h1 class="page-title">Telegram Notifications</h1>
+    <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+      Configure automated alerts for newly discovered damaged, salvage, and repairable vehicles.
+    </p>
+  </div>
+</div>
+
+<div class="card" style="max-width: 750px; margin: 0 auto;">
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="form-group" style="padding:1rem; border-radius:0.5rem; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); margin-bottom:1.5rem;">
+      <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; font-weight:600; font-size:1rem; color:#fff;">
+        <input type="checkbox" name="telegram_enabled" value="1" {% if enabled %}checked{% endif %} style="transform:scale(1.2);">
+        Enable Telegram Push Notifications
+      </label>
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.35rem; margin-left:1.8rem;">
+        When enabled, new matching vehicles discovered during monitoring will immediately trigger Telegram messages.
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="telegram_bot_token">
+        Bot Token *
+        {% if token_configured %}
+          <span class="badge badge-ready" style="font-size:0.75rem; margin-left:0.5rem;">✓ Encrypted Token Configured</span>
+        {% else %}
+          <span class="badge badge-error" style="font-size:0.75rem; margin-left:0.5rem;">Missing</span>
+        {% endif %}
+      </label>
+      <input type="password" id="telegram_bot_token" name="telegram_bot_token" class="form-control"
+             placeholder="{% if token_configured %}•••••••••••••••••••••••••••••••• (Leave blank to keep existing){% else %}e.g. 123456789:AA...{% endif %}">
+      <div class="form-text">
+        Created via Telegram's @BotFather. Stored Fernet-encrypted at rest in SQLite; never logged or exposed in responses.
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="telegram_chat_id">Destination Chat ID *</label>
+      <input type="text" id="telegram_chat_id" name="telegram_chat_id" class="form-control" value="{{ chat_id or '' }}" placeholder="e.g. 7809021498 or -100123456789" required>
+      <div class="form-text">
+        Your personal Telegram user ID, group ID, or channel ID.
+      </div>
+    </div>
+
+    <div style="margin: 1.5rem 0; padding-top: 1rem; border-top: 1px solid var(--border-color); display:flex; flex-direction:column; gap:0.5rem;">
+      <h4 style="margin:0 0 0.5rem 0; font-size:0.95rem; color:#cbd5e1;">Delivery Preferences</h4>
+
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="telegram_disable_preview" value="1" {% if disable_preview %}checked{% endif %}>
+        <span style="font-size:0.875rem;">Disable web page link previews (cleaner message cards)</span>
+      </label>
+
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="telegram_silent" value="1" {% if silent %}checked{% endif %}>
+        <span style="font-size:0.875rem;">Send silently without notification sound</span>
+      </label>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2rem; padding-top:1.25rem; border-top:1px solid var(--border-color);">
+      <!-- Test Notification Button -->
+      <button type="submit" name="action" value="test" class="btn btn-outline" {% if not token_configured and not chat_id %}disabled{% endif %}>
+        🔔 Send Test Notification
+      </button>
+
+      <!-- Save Settings Button -->
+      <button type="submit" name="action" value="save" class="btn btn-primary" style="padding:0.6rem 1.5rem;">
+        Save Telegram Settings
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

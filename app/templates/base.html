@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Marketplace Search Intelligence{% endblock %} - FMBot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="app-container">
+    {% if current_user.is_authenticated %}
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        🚗 <span>Marketplace Bot</span>
+      </div>
+      <ul class="sidebar-nav">
+        <li>
+          <a href="{{ url_for('overview.index') }}" class="sidebar-link {% if request.blueprint == 'overview' %}active{% endif %}">
+            📊 Overview
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('accounts.index') }}" class="sidebar-link {% if request.blueprint == 'accounts' %}active{% endif %}">
+            👥 Account Manager
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('searches.index') }}" class="sidebar-link {% if request.blueprint == 'searches' %}active{% endif %}">
+            🔍 Search Manager
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('monitoring.index') }}" class="sidebar-link {% if request.blueprint == 'monitoring' %}active{% endif %}">
+            📡 Live Monitoring
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('listings.index') }}" class="sidebar-link {% if request.blueprint == 'listings' %}active{% endif %}">
+            🚙 Matched Listings
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('telegram.index') }}" class="sidebar-link {% if request.blueprint == 'telegram' %}active{% endif %}">
+            ✈️ Telegram Settings
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('logs.index') }}" class="sidebar-link {% if request.blueprint == 'logs' %}active{% endif %}">
+            📜 Activity Logs
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('settings.index') }}" class="sidebar-link {% if request.blueprint == 'settings' %}active{% endif %}">
+            ⚙️ Application Settings
+          </a>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>👤 {{ current_user.username }}</span>
+          <a href="{{ url_for('auth.logout') }}" style="color:#ef4444; text-decoration:none; font-weight:600;">Sign out</a>
+        </div>
+      </div>
+    </aside>
+    {% endif %}
+
+    <!-- Main Content Area -->
+    <main class="main-content" {% if not current_user.is_authenticated %}style="margin-left:0; max-width:100%;"{% endif %}>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

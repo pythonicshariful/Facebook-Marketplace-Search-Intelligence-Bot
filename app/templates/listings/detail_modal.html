@@ -1,0 +1,30 @@
+<div style="padding:1rem;">
+  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem;">
+    <h2 style="font-size:1.35rem; margin:0;">{{ listing.title }}</h2>
+    <span style="font-size:1.5rem; font-weight:700; color:#34d399;">{{ listing.price_cents|format_price }}</span>
+  </div>
+
+  <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+    📍 {{ listing.location or 'Location not specified' }}
+    {% if listing.mileage %}• {{ listing.mileage }}{% endif %}
+    • Detected: {{ listing.first_seen_at|format_dt }}
+  </div>
+
+  {% if listing.image_url %}
+    <img src="{{ listing.image_url }}" alt="{{ listing.title }}" style="width:100%; max-height:360px; object-fit:cover; border-radius:0.5rem; margin-bottom:1rem;">
+  {% endif %}
+
+  {% if listing.description %}
+    <div style="background:rgba(15, 23, 42, 0.6); padding:1rem; border-radius:0.5rem; border:1px solid var(--border-color); margin-bottom:1rem;">
+      <h4 style="margin:0 0 0.5rem 0; font-size:0.9rem; color:#60a5fa;">Listing Description</h4>
+      <p style="margin:0; font-size:0.875rem; white-space:pre-wrap; line-height:1.4;">{{ listing.description }}</p>
+    </div>
+  {% endif %}
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem;">
+    <span style="font-size:0.8rem; color:var(--text-muted);">Listing Key: <code>{{ listing.listing_key }}</code></span>
+    <a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+      Open on Facebook Marketplace ↗
+    </a>
+  </div>
+</div>

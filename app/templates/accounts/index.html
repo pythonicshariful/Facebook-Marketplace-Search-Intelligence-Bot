@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}Account Manager{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+  <div>
+    <h1 class="page-title">Multi-Account Manager</h1>
+    <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+      Manage dedicated Facebook browser profiles, session statuses, and manual login flows.
+    </p>
+  </div>
+  <div style="display:flex; gap:0.5rem; align-items:center;">
+    <button type="button" class="btn btn-outline" onclick="openModal('addAccountModal')">+ Add Account</button>
+    <a href="{{ url_for('accounts.export_json') }}" class="btn btn-outline" title="Export non-sensitive JSON metadata">Export JSON</a>
+    <a href="{{ url_for('accounts.export_pkl') }}" class="btn btn-outline" title="Export non-sensitive Pickle metadata">Export PKL</a>
+    <!-- Clearly visible Save Accounts button -->
+    <button type="submit" form="saveAccountsForm" class="btn btn-success" style="font-size:0.95rem; padding:0.6rem 1.25rem;">
+      💾 Save Accounts
+    </button>
+  </div>
+</div>
+
+<!-- Info banner regarding manual login & locking -->
+<div class="card" style="background: rgba(30, 41, 59, 0.7); border-left: 4px solid #3b82f6; padding: 1rem 1.25rem;">
+  <div style="display:flex; gap:0.75rem; align-items:flex-start;">
+    <span style="font-size:1.3rem;">ℹ️</span>
+    <div style="font-size:0.875rem; color:#cbd5e1; line-height:1.45;">
+      <strong>Browser Profile Handling:</strong> Each account uses an isolated, persistent Chrome profile under <code>data/browser_profiles/</code>.
+      To sign in, click <strong>Open Browser / Login</strong>, log in manually inside the opened window (complete any 2FA/checkpoints), and then click <strong>Confirm Login / Continue</strong>.
+      Profiles are strictly locked to prevent duplicate Chrome instances. No passwords or tokens are stored in plain text.
+    </div>
+  </div>
+</div>
+
+{% set waiting_accounts = accounts|selectattr('session_status', 'equalto', 'waiting_login')|list %}
+{% if waiting_accounts %}
+<div class="card" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-left: 5px solid #f59e0b; padding: 1.25rem; margin-bottom: 1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+    <div>
+      <div style="font-weight:700; color:#fbbf24; font-size:1.05rem; margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
+        <span>⏳</span> Waiting for Manual Login
+      </div>
+      <div style="font-size:0.875rem; color:#f1f5f9; line-height:1.45;">
+        Chrome is currently open for: <strong>{{ waiting_accounts|map(attribute='display_name')|join(', ') }}</strong>.<br>
+        Please switch to the Chrome window, sign in to Facebook manually (and complete any verification codes/CAPTCHAs), then click <strong>Confirm Login / Continue</strong>.
+      </div>
+    </div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      {% for w in waiting_accounts %}
+        <button type="button" class="btn btn-success" onclick="postAction('{{ url_for('accounts.confirm_login', account_id=w.id) }}')">
+          ✓ Confirm Login / Continue ({{ w.display_name }})
+        </button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Main Accounts Form for batch "Save Accounts" -->
+<form id="saveAccountsForm" method="POST" action="{{ url_for('accounts.save_all') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">Enabled</th>
+            <th>Account ID</th>
+            <th>Display Name</th>
+            <th>Session Status</th>
+            <th>Assigned Searches</th>
+            <th>Profile Path</th>
+            <th>Daily Limit</th>
+            <th>Last Success</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for acc in accounts %}
+          <tr>
+            <!-- Enabled toggle checkbox -->
+            <td style="text-align:center;">
+              <input type="checkbox" name="enabled_{{ acc.id }}" value="1" {% if acc.enabled %}checked{% endif %}>
+            </td>
+
+            <!-- Internal ID -->
+            <td>
+              <code>{{ acc.internal_id }}</code>
+            </td>
+
+            <!-- Display name editable field -->
+            <td>
+              <input type="text" name="display_name_{{ acc.id }}" value="{{ acc.display_name }}"
+                     class="form-control" style="padding:0.35rem 0.6rem; font-size:0.875rem; min-width:140px;" required>
+            </td>
+
+            <!-- Session Status badge -->
+            <td>
+              {% if acc.session_status == 'ready' %}
+                <span class="badge badge-ready">Session Ready</span>
+              {% elif acc.session_status == 'waiting_login' %}
+                <span class="badge badge-waiting">Waiting for Manual Login</span>
+              {% elif acc.session_status == 'needs_attention' %}
+                <span class="badge badge-error">Needs Attention</span>
+              {% elif acc.session_status == 'expired' %}
+                <span class="badge badge-error">Login Required</span>
+              {% elif acc.session_status == 'new' %}
+                <span class="badge badge-neutral">Not Logged In</span>
+              {% else %}
+                <span class="badge badge-neutral">{{ acc.status_label }}</span>
+              {% endif %}
+
+              {% if acc.id in open_account_ids %}
+                <span class="badge badge-info" title="Browser window or session is currently active">Browser Open</span>
+              {% endif %}
+
+              {% if acc.status_message %}
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem; max-width:260px; line-height:1.2;">
+                  {{ acc.status_message }}
+                </div>
+              {% endif %}
+            </td>
+
+            <!-- Assigned Searches count -->
+            <td>
+              <span class="badge badge-neutral" style="font-size:0.8rem;">
+                {{ acc.searches|selectattr('deleted_at', 'none')|list|length }} searches
+              </span>
+            </td>
+
+            <!-- Profile directory -->
+            <td style="font-family:monospace; font-size:0.75rem; color:var(--text-muted);" title="{{ acc.profile_dir }}">
+              {{ acc.profile_dir|truncate(28, True, '...') }}
+            </td>
+
+            <!-- Daily Limit editable field -->
+            <td>
+              <input type="number" name="daily_run_limit_{{ acc.id }}" value="{{ acc.daily_run_limit }}" min="0" max="10000"
+                     class="form-control" style="padding:0.35rem 0.6rem; font-size:0.85rem; width:80px;" title="0 = unlimited runs">
+            </td>
+
+            <!-- Last Success -->
+            <td style="font-size:0.8rem; color:var(--text-muted);">
+              {{ acc.last_success_at|format_dt }}
+            </td>
+
+            <!-- Actions buttons -->
+            <td style="text-align:right; white-space:nowrap;">
+              <div style="display:inline-flex; gap:0.35rem;">
+                {% if acc.id in open_account_ids or acc.session_status == 'waiting_login' %}
+                  <!-- Confirm Login / Continue button -->
+                  <button type="button" class="btn btn-success btn-sm" onclick="postAction('{{ url_for('accounts.confirm_login', account_id=acc.id) }}')" title="Verify that manual login is complete">
+                    Confirm Login / Continue
+                  </button>
+                  {% if acc.id in open_account_ids %}
+                    <!-- Close browser button -->
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="postAction('{{ url_for('accounts.close_browser', account_id=acc.id) }}')" title="Close browser window">
+                      Close
+                    </button>
+                  {% else %}
+                    <!-- Re-open browser if closed -->
+                    <button type="button" class="btn btn-primary btn-sm" onclick="postAction('{{ url_for('accounts.open_login', account_id=acc.id) }}')" title="Reopen Chrome window">
+                      Open Browser
+                    </button>
+                  {% endif %}
+                {% else %}
+                  <!-- Open Browser / Login -->
+                  <button type="button" class="btn btn-primary btn-sm" onclick="postAction('{{ url_for('accounts.open_login', account_id=acc.id) }}')">
+                    Open Browser / Login
+                  </button>
+                  <!-- Verify session -->
+                  <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('accounts.verify', account_id=acc.id) }}')">
+                    Verify
+                  </button>
+                {% endif %}
+
+                <!-- Delete account button -->
+                <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteAccount({{ acc.id }}, '{{ acc.display_name }}')">
+                  ✕
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">
+              No Facebook browser accounts configured. Click <strong>+ Add Account</strong> to create your first profile.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</form>
+
+<!-- Add Account Modal -->
+<div id="addAccountModal" class="modal">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+      <h3 style="margin:0; font-size:1.25rem;">Add Facebook Account Profile</h3>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('addAccountModal')">✕</button>
+    </div>
+
+    <form method="POST" action="{{ url_for('accounts.add') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group">
+        <label class="form-label" for="display_name">Display Name / Label</label>
+        <input type="text" id="display_name" name="display_name" class="form-control" placeholder="e.g. Account A (Portland)" required>
+        <div class="form-text">A memorable label for this operator profile.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="daily_run_limit">Daily Run Limit</label>
+        <input type="number" id="daily_run_limit" name="daily_run_limit" class="form-control" value="0" min="0">
+        <div class="form-text">0 = unlimited runs per day. Helps balance activity across accounts.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="notes">Notes (Optional)</label>
+        <textarea id="notes" name="notes" class="form-control" rows="2" placeholder="Optional operator notes..."></textarea>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addAccountModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Profile</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Hidden Action Form for POST buttons -->
+<form id="genericPostForm" method="POST" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+function postAction(url) {
+  const form = document.getElementById('genericPostForm');
+  form.action = url;
+  form.submit();
+}
+function confirmDeleteAccount(id, name) {
+  if (confirm(`Are you sure you want to remove account "${name}"? Searches assigned to it will pause until reassigned.`)) {
+    const deleteFiles = confirm(`Do you also want to permanently delete the Chrome profile directory on disk? (Click Cancel to keep browser profile files)`);
+    const form = document.getElementById('genericPostForm');
+    form.action = `/accounts/${id}/delete`;
+    
+    // add delete_files input
+    let input = form.querySelector('input[name="delete_files"]');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'delete_files';
+      form.appendChild(input);
+    }
+    input.value = deleteFiles ? '1' : '0';
+    form.submit();
+  }
+}
+</script>
+{% endblock %}

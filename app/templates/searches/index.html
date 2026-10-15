@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Search Manager{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+  <div>
+    <h1 class="page-title">Search Manager</h1>
+    <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+      Configure vehicle search criteria, damage/condition filters, scheduling intervals, and account assignments.
+    </p>
+  </div>
+  <div>
+    <a href="{{ url_for('searches.create') }}" class="btn btn-primary">+ Create New Search</a>
+  </div>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="table-responsive">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Search Name</th>
+          <th>Criteria & Keywords</th>
+          <th>Location / Radius</th>
+          <th>Price Range</th>
+          <th>Account Assignment</th>
+          <th>Interval</th>
+          <th>Status</th>
+          <th>Next Run</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in searches %}
+        <tr>
+          <!-- Name & Details -->
+          <td>
+            <div style="font-weight:700; font-size:0.95rem; color:#fff;">
+              {{ s.name }}
+            </div>
+            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">
+              Terms: <em>"{{ s.search_terms or '—' }}"</em>
+              {% if s.make or s.model %}
+                • {{ s.make or '' }} {{ s.model or '' }}
+              {% endif %}
+            </div>
+            {% if s.status_message %}
+              <div style="font-size:0.75rem; color:#94a3b8; margin-top:0.25rem; max-width:280px; line-height:1.2;">
+                {{ s.status_message }}
+              </div>
+            {% endif %}
+          </td>
+
+          <!-- Condition & Keywords -->
+          <td>
+            <span class="badge badge-info" style="font-size:0.75rem;">
+              {{ conditions.get(s.vehicle_condition, (s.vehicle_condition, []))[0] }}
+            </span>
+            {% if s.include_keywords %}
+              <div style="font-size:0.75rem; color:#34d399; margin-top:0.3rem;">
+                + Include: {{ s.include_keywords.split('\n')|join(', ') }}
+              </div>
+            {% endif %}
+            {% if s.exclude_keywords %}
+              <div style="font-size:0.75rem; color:#f87171; margin-top:0.15rem;">
+                - Exclude: {{ s.exclude_keywords.split('\n')|join(', ') }}
+              </div>
+            {% endif %}
+          </td>
+
+          <!-- Location & Radius -->
+          <td style="font-size:0.85rem;">
+            <div>{{ s.location or (s.location_slug if s.location_slug else 'Profile default') }}</div>
+            {% if s.radius_miles %}
+              <div style="font-size:0.75rem; color:var(--text-muted);">Radius: {{ s.radius_miles }} mi</div>
+            {% endif %}
+          </td>
+
+          <!-- Price -->
+          <td style="font-size:0.85rem; font-weight:600; color:#38bdf8;">
+            {% if s.min_price is not none and s.max_price is not none %}
+              ${{ s.min_price }} - ${{ s.max_price }}
+            {% elif s.min_price is not none %}
+              From ${{ s.min_price }}
+            {% elif s.max_price is not none %}
+              Up to ${{ s.max_price }}
+            {% else %}
+              Any price
+            {% endif %}
+          </td>
+
+          <!-- Account assignment -->
+          <td>
+            {% if s.account_mode == 'auto' %}
+              <span class="badge badge-info" title="Intelligent account selection engine">Auto Select</span>
+            {% elif s.account %}
+              <span class="badge badge-neutral" title="Assigned specifically to this account">
+                👤 {{ s.account.display_name }}
+              </span>
+            {% else %}
+              <span class="badge badge-error">No Account</span>
+            {% endif %}
+
+            {% if s.last_selection_reason %}
+              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem; max-width:200px; line-height:1.2;">
+                {{ s.last_selection_reason }}
+              </div>
+            {% endif %}
+          </td>
+
+          <!-- Interval -->
+          <td style="font-size:0.85rem;">
+            {{ s.interval_minutes }}m
+          </td>
+
+          <!-- Status -->
+          <td>
+            {% if s.is_running %}
+              <span class="badge badge-info" style="animation:pulse 1.5s infinite;">Running</span>
+            {% elif s.status == 'active' %}
+              <span class="badge badge-ready">Active</span>
+            {% elif s.status == 'paused' %}
+              <span class="badge badge-waiting">Paused</span>
+            {% elif s.status == 'waiting_account' %}
+              <span class="badge badge-waiting">Waiting Account</span>
+            {% elif s.status == 'failed' %}
+              <span class="badge badge-error">Failed</span>
+            {% else %}
+              <span class="badge badge-neutral">{{ s.status }}</span>
+            {% endif %}
+          </td>
+
+          <!-- Next Run -->
+          <td style="font-size:0.8rem; color:var(--text-muted);">
+            {% if s.status == 'active' %}
+              {{ s.next_run_at|format_dt }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
+          <!-- Actions -->
+          <td style="text-align:right; white-space:nowrap;">
+            <div style="display:inline-flex; gap:0.35rem;">
+              <!-- Run Now -->
+              <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('searches.run_now', search_id=s.id) }}')" title="Run immediately">
+                ▶ Run
+              </button>
+
+              <!-- Pause / Resume -->
+              {% if s.status == 'active' %}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="postAction('{{ url_for('searches.pause', search_id=s.id) }}')" title="Pause monitoring">
+                  ⏸
+                </button>
+              {% else %}
+                <button type="button" class="btn btn-success btn-sm" onclick="postAction('{{ url_for('searches.resume', search_id=s.id) }}')" title="Resume monitoring">
+                  ⏵
+                </button>
+              {% endif %}
+
+              <!-- Edit -->
+              <a href="{{ url_for('searches.edit', search_id=s.id) }}" class="btn btn-outline btn-sm" title="Edit search configuration">
+                ✏️
+              </a>
+
+              <!-- Duplicate -->
+              <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('searches.duplicate', search_id=s.id) }}')" title="Duplicate search">
+                📋
+              </button>
+
+              <!-- Delete -->
+              <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteSearch({{ s.id }}, '{{ s.name }}')" title="Delete search">
+                ✕
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">
+            No searches created yet. Click <strong>+ Create New Search</strong> to start monitoring Facebook Marketplace!
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Hidden action form -->
+<form id="searchActionForm" method="POST" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function postAction(url) {
+  const form = document.getElementById('searchActionForm');
+  form.action = url;
+  form.submit();
+}
+function confirmDeleteSearch(id, name) {
+  if (confirm(`Are you sure you want to delete search "${name}"? Existing discovered listings will remain in the database.`)) {
+    const form = document.getElementById('searchActionForm');
+    form.action = `/searches/${id}/delete`;
+    form.submit();
+  }
+}
+</script>
+{% endblock %}

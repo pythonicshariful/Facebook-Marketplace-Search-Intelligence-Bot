@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Live Monitoring{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+  <div>
+    <h1 class="page-title">Live Monitoring</h1>
+    <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+      Real-time inspectability of background tasks, open Chrome sessions, and search execution cycles.
+    </p>
+  </div>
+  <div>
+    <button type="button" class="btn btn-outline" onclick="location.reload();">🔄 Refresh</button>
+  </div>
+</div>
+
+<!-- Active Browser Sessions Section -->
+<div class="card">
+  <h3 style="margin-top:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
+    🌐 Active Browser Sessions ({{ browser_snapshot|length }})
+  </h3>
+  {% if browser_snapshot %}
+  <div class="table-responsive">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>Purpose</th>
+          <th>Current Activity</th>
+          <th>Mode</th>
+          <th>Lock Status</th>
+          <th>Session Age</th>
+          <th>Last Activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in browser_snapshot %}
+        <tr>
+          <td><strong>{{ b.label }}</strong> (ID: {{ b.account_id }})</td>
+          <td><span class="badge badge-info">{{ b.purpose }}</span></td>
+          <td>
+            <span style="color:#60a5fa; font-weight:600;">{{ b.activity }}</span>
+          </td>
+          <td>{{ "Headless" if b.headless else "Visible Window" }}</td>
+          <td>
+            {% if b.busy %}
+              <span class="badge badge-waiting">Task in progress</span>
+            {% else %}
+              <span class="badge badge-ready">Idle</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.8rem; color:var(--text-muted);">{{ b.opened_at|truncate(19, True, '') }}</td>
+          <td style="font-size:0.8rem; color:var(--text-muted);">{{ b.last_used_at|truncate(19, True, '') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p style="color:var(--text-muted); font-size:0.9rem; margin:0; padding:0.5rem 0;">
+      No browser sessions currently open. Browsers launch automatically when scheduled or when an operator opens them.
+    </p>
+  {% endif %}
+</div>
+
+<!-- Execution History Table -->
+<div class="card">
+  <h3 style="margin-top:0; font-size:1.15rem;">Recent Execution History</h3>
+  {% if recent_executions %}
+  <div class="table-responsive">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Execution ID</th>
+          <th>Search</th>
+          <th>Account</th>
+          <th>Trigger</th>
+          <th>Status</th>
+          <th>Page State</th>
+          <th>Selection Decision</th>
+          <th>Results</th>
+          <th>Duration</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ex in recent_executions %}
+        <tr>
+          <td><code>#{{ ex.id }}</code></td>
+          <td><strong>{{ ex.search.name if ex.search else 'Deleted Search' }}</strong></td>
+          <td>{{ ex.account.display_name if ex.account else '—' }}</td>
+          <td><span class="badge badge-neutral">{{ ex.trigger }}</span></td>
+          <td>
+            {% if ex.status == 'success' %}
+              <span class="badge badge-ready">Success</span>
+            {% elif ex.status == 'running' %}
+              <span class="badge badge-info">Running</span>
+            {% elif ex.status == 'blocked' %}
+              <span class="badge badge-error">Blocked</span>
+            {% elif ex.status == 'waiting_account' %}
+              <span class="badge badge-waiting">Waiting</span>
+            {% elif ex.status == 'interrupted' %}
+              <span class="badge badge-neutral">Interrupted</span>
+            {% else %}
+              <span class="badge badge-error">{{ ex.status }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.8rem;">
+            <code>{{ ex.page_state or '—' }}</code>
+          </td>
+          <td style="font-size:0.75rem; color:var(--text-muted); max-width:240px; line-height:1.2;">
+            {{ ex.selection_reason or '—' }}
+          </td>
+          <td>
+            <span style="font-size:0.85rem;" title="Found / Matched / New / Notified">
+              {{ ex.found_count }} / <strong style="color:#34d399;">{{ ex.matched_count }}</strong> / +{{ ex.new_count }}
+              {% if ex.notified_count %}(📣 {{ ex.notified_count }}){% endif %}
+            </span>
+          </td>
+          <td style="font-size:0.8rem; color:var(--text-muted);">
+            {% if ex.duration_seconds is not none %}
+              {{ "%.1f"|format(ex.duration_seconds) }}s
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td style="font-size:0.8rem; color:var(--text-muted);">
+            {{ ex.started_at|format_dt }}
+          </td>
+        </tr>
+        {% if ex.error %}
+        <tr>
+          <td colspan="10" style="background:rgba(239, 68, 68, 0.05); padding:0.4rem 1rem; border-bottom:1px solid var(--border-color);">
+            <div style="font-size:0.75rem; color:#f87171; font-family:monospace;">
+              Error details: {{ ex.error }}
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p style="color:var(--text-muted); font-size:0.9rem; margin:0; padding:1rem 0;">No execution records found.</p>
+  {% endif %}
+</div>
+{% endblock %}

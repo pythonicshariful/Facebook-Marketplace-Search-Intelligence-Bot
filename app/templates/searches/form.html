@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}{% if search %}Edit Search - {{ search.name }}{% else %}New Search{% endif %}{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+  <div>
+    <h1 class="page-title">{% if search %}Edit Search{% else %}Create New Search{% endif %}</h1>
+    <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+      Configure target criteria, vehicle condition rules, scheduling, and profile assignments.
+    </p>
+  </div>
+  <div>
+    <a href="{{ url_for('searches.index') }}" class="btn btn-secondary">← Back to Searches</a>
+  </div>
+</div>
+
+<div class="card" style="max-width: 900px; margin: 0 auto;">
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- 1. General Identification -->
+    <h3 style="font-size:1.15rem; margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; color:#60a5fa;">
+      1. Search Identification
+    </h3>
+    <div class="form-group">
+      <label class="form-label" for="name">Search Name *</label>
+      <input type="text" id="name" name="name" class="form-control" value="{{ search.name if search else '' }}" placeholder="e.g. Honda Civic Damaged / Blown Engine" required>
+      <div class="form-text">A descriptive label identifying this monitoring query.</div>
+    </div>
+
+    <!-- 2. Search Query & Vehicle Make/Model -->
+    <h3 style="font-size:1.15rem; margin-top:2rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; color:#60a5fa;">
+      2. Target Terms & Vehicle Details
+    </h3>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:1rem;">
+      <div class="form-group">
+        <label class="form-label" for="search_terms">Search Query Terms</label>
+        <input type="text" id="search_terms" name="search_terms" class="form-control" value="{{ search.search_terms if search else '' }}" placeholder="e.g. Honda Civic, Ford F150">
+        <div class="form-text">Passed to the Marketplace search field.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="make">Make (Optional)</label>
+        <input type="text" id="make" name="make" class="form-control" value="{{ search.make if search and search.make else '' }}" placeholder="e.g. Honda">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="model">Model (Optional)</label>
+        <input type="text" id="model" name="model" class="form-control" value="{{ search.model if search and search.model else '' }}" placeholder="e.g. Civic">
+      </div>
+    </div>
+
+    <!-- 3. Location & Price Range -->
+    <h3 style="font-size:1.15rem; margin-top:2rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; color:#60a5fa;">
+      3. Location & Price Limits
+    </h3>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem;">
+      <div class="form-group">
+        <label class="form-label" for="location">Location Name / Label</label>
+        <input type="text" id="location" name="location" class="form-control" value="{{ search.location if search and search.location else '' }}" placeholder="e.g. Portland, Oregon">
+        <div class="form-text">Human-readable location label.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="location_slug">Marketplace URL Slug / ID</label>
+        <input type="text" id="location_slug" name="location_slug" class="form-control" value="{{ search.location_slug if search and search.location_slug else '' }}" placeholder="e.g. portland">
+        <div class="form-text">Marketplace URL path segment (leave blank to use the browser profile's default location).</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="radius_miles">Radius (Miles)</label>
+        <input type="number" id="radius_miles" name="radius_miles" class="form-control" value="{{ search.radius_miles if search and search.radius_miles else '' }}" min="1" max="500" placeholder="e.g. 25">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem;">
+      <div class="form-group">
+        <label class="form-label" for="min_price">Minimum Price ($)</label>
+        <input type="number" id="min_price" name="min_price" class="form-control" value="{{ search.min_price if search and search.min_price is not none else '0' }}" min="0">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="max_price">Maximum Price ($)</label>
+        <input type="number" id="max_price" name="max_price" class="form-control" value="{{ search.max_price if search and search.max_price is not none else '2000' }}" min="0">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="sort_by">Sorting Order</label>
+        <select id="sort_by" name="sort_by" class="form-control">
+          {% for key, (label, param) in sort_options.items() %}
+            <option value="{{ key }}" {% if search and search.sort_by == key %}selected{% elif not search and key == 'newest' %}selected{% endif %}>
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- 4. Vehicle Condition & Keyword Filters -->
+    <h3 style="font-size:1.15rem; margin-top:2rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; color:#60a5fa;">
+      4. Damage, Condition & Keyword Filters (Application-Side)
+    </h3>
+    <div class="form-group">
+      <label class="form-label" for="vehicle_condition">Vehicle Condition Preset</label>
+      <select id="vehicle_condition" name="vehicle_condition" class="form-control">
+        {% for key, (label, kws) in conditions.items() %}
+          <option value="{{ key }}" {% if search and search.vehicle_condition == key %}selected{% elif not search and key == 'damaged' %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+      <div class="form-text">
+        Applies built-in heuristics (e.g. "blown engine", "damaged", "non-running", "wrecked", "salvage", "needs repair").
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1rem;">
+      <div class="form-group">
+        <label class="form-label" for="include_keywords">Include Keywords (One per line)</label>
+        <textarea id="include_keywords" name="include_keywords" class="form-control" rows="4" placeholder="Damaged&#10;Blown engine&#10;Non-running&#10;Needs repair&#10;Mechanic special">{{ search.include_keywords if search else 'Damaged\nBlown engine\nNon-running\nNeeds repair' }}</textarea>
+        <div class="form-text">Listing must match at least one of these keywords (if specified).</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="exclude_keywords">Exclude Keywords (One per line)</label>
+        <textarea id="exclude_keywords" name="exclude_keywords" class="form-control" rows="4" placeholder="Parts only&#10;Accessories&#10;Wheels only&#10;Scam">{{ search.exclude_keywords if search else 'Parts only\nAccessories' }}</textarea>
+        <div class="form-text">Any listing matching an exclude keyword is blocked immediately.</div>
+      </div>
+    </div>
+
+    <!-- 5. Account Assignment & Scheduling -->
+    <h3 style="font-size:1.15rem; margin-top:2rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; color:#60a5fa;">
+      5. Account Assignment & Execution Schedule
+    </h3>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:1rem;">
+      <!-- Account Selection Control -->
+      <div class="form-group">
+        <label class="form-label" for="account">Facebook Account Selection *</label>
+        <select id="account" name="account" class="form-control" required>
+          <option value="auto" {% if (search and search.account_mode == 'auto') or not search %}selected{% endif %}>
+            ✨ Auto Select (Intelligent Eligibility Engine)
+          </option>
+          <optgroup label="Specific Configured Accounts">
+            {% for acc in accounts %}
+              <option value="{{ acc.id }}" {% if search and search.account_mode == 'specific' and search.account_id == acc.id %}selected{% endif %}>
+                👤 {{ acc.display_name }} ({{ acc.internal_id }})
+              </option>
+            {% endfor %}
+          </optgroup>
+        </select>
+        <div class="form-text">
+          When a specific account is chosen, the search uses <em>only</em> that account's profile.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="interval_minutes">Monitoring Interval (Minutes)</label>
+        <input type="number" id="interval_minutes" name="interval_minutes" class="form-control" value="{{ search.interval_minutes if search else '10' }}" min="1">
+        <div class="form-text">How often to check for new listings. Subject to system minimum.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:1rem; display:flex; flex-direction:column; gap:0.5rem;">
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="notify_telegram" value="1" {% if not search or search.notify_telegram %}checked{% endif %}>
+        <span style="font-size:0.9rem; font-weight:600;">Send Telegram notifications when new matching listings are discovered</span>
+      </label>
+
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="fetch_details" value="1" {% if search and search.fetch_details %}checked{% endif %}>
+        <span style="font-size:0.9rem;">Fetch full listing detail pages for candidate matches if description is missing</span>
+      </label>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:2.5rem; border-top:1px solid var(--border-color); padding-top:1.25rem;">
+      <a href="{{ url_for('searches.index') }}" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" style="padding:0.6rem 1.5rem;">
+        {% if search %}Save Changes{% else %}Create Search{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
