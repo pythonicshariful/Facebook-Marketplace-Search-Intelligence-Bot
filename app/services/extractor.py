@@ -62,6 +62,18 @@ def parse_card(anchor: Tag) -> dict[str, Any] | None:
         if S.LOCATION_LINE_RE.match(line):
             location = line
             break
+    # Fallback to aria-label if fields missing (Facebook exposes: title, price, location, listing id)
+    aria_label = (anchor.get("aria-label") or "").strip()
+    if aria_label and (not title or not price_text or not location):
+        parts = [p.strip() for p in aria_label.split(",") if p.strip()]
+        if not title and parts:
+            title = parts[0]
+        for p in parts:
+            if not price_text and S.PRICE_LINE_RE.match(p):
+                price_text = p
+            elif not location and S.LOCATION_LINE_RE.match(p):
+                location = p
+
     if not title and img_alt:
         title = img_alt
     if not title and not m:

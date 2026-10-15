@@ -30,8 +30,8 @@ DETAIL_META = {
     "image": 'meta[property="og:image"]',
 }
 
-# Text-line heuristics inside a listing card
-PRICE_LINE_RE = re.compile(r"^(?:[A-Z]{0,3}\$|US\$|CA\$|£|€|₹|৳)\s?[\d.,]+\s?[KkMm]?$|^free$", re.I)
+# Text-line heuristics inside a listing card (supports $, US$, CA$, BDT, EUR, GBP, £, €, ₹, ৳, etc.)
+PRICE_LINE_RE = re.compile(r"^(?:[A-Z]{1,4}\$|\b[A-Z]{3}\b|[A-Z]{0,3}\$|US\$|CA\$|BDT|USD|EUR|GBP|£|€|₹|৳)\s?[\d.,]+\s?[KkMm]?$|^free$", re.I)
 MILEAGE_LINE_RE = re.compile(r"\b\d[\d.,]*\s?[Kk]?\s?(?:miles|mi|km)\b", re.I)
 LOCATION_LINE_RE = re.compile(r"^[A-Za-z .'\-]+,\s?[A-Z]{2}$|^[A-Za-z .'\-]+,\s?[A-Za-z .'\-]+$")
 
