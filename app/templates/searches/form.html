@@ -117,8 +117,8 @@
     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1rem;">
       <div class="form-group">
         <label class="form-label" for="include_keywords">Include Keywords (One per line)</label>
-        <textarea id="include_keywords" name="include_keywords" class="form-control" rows="4" placeholder="e.g. 128GB&#10;Unlocked&#10;Damaged&#10;Display">{{ search.include_keywords if search else '' }}</textarea>
-        <div class="form-text">Listing must match at least one of these keywords (if specified). Matches in title, description, and URL.</div>
+        <textarea id="include_keywords" name="include_keywords" class="form-control" rows="4" placeholder="e.g. 128gb&#10;unlocked&#10;damaged&#10;display">{{ search.include_keywords if search else '' }}</textarea>
+        <div class="form-text">Listing must match at least one of these keywords (if specified). Case-insensitive (all small letters automatically). Matches title, description, condition, location, seller, and URL.</div>
       </div>
 
       <div class="form-group">

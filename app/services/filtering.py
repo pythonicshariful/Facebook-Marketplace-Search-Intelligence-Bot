@@ -32,38 +32,77 @@ CONDITION_KEYWORDS["any_problem"] = (
 )
 
 _QUOTES = {"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'}
+_PUNCT_RE = re.compile(r"[\s\-_/|•·,.;:!?()\[\]{}*+&\"`~^<>#@%=—–…\\]+")
 
 
 def normalize_text(text: str | None) -> str:
+    """Normalize text into clean, single-spaced lowercase words with punctuation removed."""
     if not text:
         return ""
-    s = unicodedata.normalize("NFKC", text)
+    s = unicodedata.normalize("NFKC", str(text))
     for k, v in _QUOTES.items():
         s = s.replace(k, v)
     s = s.lower()
-    s = re.sub(r"[-_/|•·,.;:!?()\[\]{}]+", " ", s)
     s = s.replace("'", "")       # doesn't -> doesnt, won't -> wont
+    s = _PUNCT_RE.sub(" ", s)
     return " ".join(s.split())
 
 
 def parse_keywords(text: str | Iterable[str] | None) -> list[str]:
+    """Parse newline/comma-separated keywords into unique, lowercase small-letter keywords."""
     if not text:
         return []
     items = text if not isinstance(text, str) else re.split(r"[\n,;]+", text)
     out, seen = [], set()
     for item in items:
-        kw = " ".join(str(item).split())
-        if kw and kw.lower() not in seen:
-            seen.add(kw.lower())
+        cleaned = str(item).strip().strip("'\"`")
+        kw = " ".join(cleaned.split()).lower()
+        if kw and kw not in seen:
+            seen.add(kw)
             out.append(kw)
     return out
 
 
-def keyword_matches(norm_haystack: str, keyword: str) -> bool:
-    kw = normalize_text(keyword)
-    if not kw:
+def _build_keyword_regex(normalized_kw: str) -> str:
+    """Build a boundary-aware regex that allows flexible spacing between digits and letters."""
+    tokens = normalized_kw.split()
+    if not tokens:
+        return ""
+    token_patterns = []
+    for token in tokens:
+        p = re.escape(token)
+        # Allow optional whitespace between adjacent digits and letters (e.g. 128gb -> 128\s*gb)
+        p = re.sub(r"(\d)(?:\\)?([a-z])", r"\1\\s*\2", p, flags=re.IGNORECASE)
+        p = re.sub(r"([a-z])(?:\\)?(\d)", r"\1\\s*\2", p, flags=re.IGNORECASE)
+        token_patterns.append(p)
+
+    pattern_parts = []
+    for i, tp in enumerate(token_patterns):
+        if i > 0:
+            prev = tokens[i - 1]
+            curr = tokens[i]
+            # Transition between digit and unit/letter (e.g. "128" and "gb" or "v" and "6") allows \s*
+            if (prev.isdigit() and curr.isalpha()) or (prev.isalpha() and curr.isdigit()):
+                pattern_parts.append(r"\s*")
+            else:
+                pattern_parts.append(r"\s+")
+        pattern_parts.append(tp)
+    inner = "".join(pattern_parts)
+    return rf"(?<![a-z0-9]){inner}(?![a-z0-9])"
+
+
+def keyword_matches(haystack: str | None, keyword: str | None) -> bool:
+    """Case-insensitive matching of keyword against haystack with small-letter normalization."""
+    if not haystack or not keyword:
         return False
-    return re.search(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])", norm_haystack) is not None
+    norm_hay = normalize_text(haystack)
+    norm_kw = normalize_text(keyword)
+    if not norm_kw or not norm_hay:
+        return False
+    regex = _build_keyword_regex(norm_kw)
+    if not regex:
+        return False
+    return re.search(regex, norm_hay, re.IGNORECASE) is not None
 
 
 _PRICE_NUM_RE = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*([KkMm])?")
@@ -102,8 +141,8 @@ class SearchCriteria:
     def from_search(cls, search, accept_unknown_price: bool = True) -> "SearchCriteria":
         return cls(make=search.make, model=search.model, min_price=search.min_price,
                    max_price=search.max_price, vehicle_condition=search.vehicle_condition or "any",
-                   include_keywords=parse_keywords(search.include_keywords),
-                   exclude_keywords=parse_keywords(search.exclude_keywords),
+                   include_keywords=[k.lower() for k in parse_keywords(search.include_keywords)],
+                   exclude_keywords=[k.lower() for k in parse_keywords(search.exclude_keywords)],
                    accept_unknown_price=accept_unknown_price)
 
     @property
@@ -128,15 +167,17 @@ def evaluate(listing: dict[str, Any], c: SearchCriteria) -> FilterResult:
     cond = listing.get("condition") or ""
     loc = listing.get("location") or ""
     seller = listing.get("seller_name") or ""
-    # Include title, description, condition, location, seller, image alt, and URL text
+    mileage = listing.get("mileage") or ""
+    price_str = listing.get("price_text") or ""
     url_text = listing.get("url") or ""
-    hay = normalize_text(" ".join([title, desc, cond, loc, seller, listing.get("image_alt") or "", url_text]))
+    # Include title, description, condition, location, seller, mileage, price, image alt, and URL text
+    hay = normalize_text(" ".join([title, desc, cond, loc, seller, mileage, price_str, listing.get("image_alt") or "", url_text]))
     reasons: list[str] = []
 
     # 1. Exclusions always win
     for kw in c.exclude_keywords:
         if keyword_matches(hay, kw):
-            return FilterResult(False, [f"excluded keyword '{kw}'"])
+            return FilterResult(False, [f"excluded keyword '{kw.lower()}'"])
 
     # 2. Price bounds
     price = listing.get("price_cents")
@@ -171,7 +212,7 @@ def evaluate(listing: dict[str, Any], c: SearchCriteria) -> FilterResult:
     if c.include_keywords:
         hit = next((k for k in c.include_keywords if keyword_matches(hay, k)), None)
         if hit:
-            reasons.append(f"include keyword '{hit}' found")
+            reasons.append(f"include keyword '{hit.lower()}' found")
         else:
             missing_text = True
             reasons.append("no include keyword (checked all product info: title, desc, condition, seller, location, URL)")

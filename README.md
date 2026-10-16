@@ -321,27 +321,92 @@ This is your comprehensive database of scraped listings:
 ---
 
 <a id="section-telegram"></a>
-### 5. ✈️ Telegram Push Notifications
-Receive real-time mobile and desktop alerts the instant a deal matches.
+### 5. ✈️ Telegram Push Notifications (Setup Guide)
+Receive real-time mobile and desktop alerts the instant a matching listing is discovered.
 
-#### How to Set Up Telegram Alerts in 2 Minutes:
-1. **Get a Bot Token from @BotFather**:
-   - Open Telegram and search for `@BotFather`.
-   - Send `/newbot`.
-   - Choose a name and username (e.g., `MyMarketplaceAlertBot`).
-   - Copy the HTTP API token (e.g., `1234567890:ABCdef...`).
-2. **Get your Chat ID from @userinfobot**:
-   - Search for `@userinfobot` on Telegram.
-   - Send `/start`.
-   - It will reply with your numeric **Id** (e.g., `1523086010`).
-3. **Configure in Dashboard**:
-   - Open the dashboard and click **✈️ Telegram Settings**.
-   - Check **☑ Enable Telegram Push Notifications**.
-   - Paste your **Bot Token** and **Chat ID**.
-   - Click **Save Telegram Settings**.
-4. **Test Delivery**:
-   - Click **🔔 Send Test Notification**.
-   - Check Telegram—you will receive an instant test confirmation message!
+---
+
+#### 🤖 Step 1: Create a Bot & Get Your Bot Token
+1. Open Telegram (on your mobile phone or desktop app).
+2. In the top search bar, search for **`@BotFather`** (ensure it has the official blue verification badge).
+3. Click **Start** or send the message:
+   ```text
+   /newbot
+   ```
+4. **Choose a display name** for your bot (e.g., `Marketplace Intelligence Bot` or `Auto Deal Alerts`).
+5. **Choose a unique username** ending with `bot` (e.g., `my_fb_marketplace_deals_bot` or `john_car_hunter_bot`).
+6. `@BotFather` will reply with your **HTTP API Token** formatted like:
+   ```text
+   7123456789:AAHk1234567890abcdefghijklmnopqrstuv
+   ```
+   Copy this token and keep it handy.
+7. ⚠️ **MANDATORY CRITICAL STEP:**
+   - Click the link to your newly created bot provided in the message (e.g., `t.me/your_bot_name`).
+   - Click **START** (or send `/start`).
+   - *(Telegram security prevents bots from sending unprompted messages until you initiate the conversation first).*
+
+---
+
+#### 🆔 Step 2: Get Your Destination Chat ID
+
+##### Option A: For Personal Direct Alerts (Most Common)
+1. In Telegram search, open **`@userinfobot`** (or **`@raw_data_bot`**).
+2. Click **Start** (or send `/start`).
+3. The bot will reply with your user profile details.
+4. Copy your numeric **`Id`** (e.g., `1523086010`). This is your personal **Chat ID**.
+
+##### Option B: For Telegram Groups (Team / Multi-user Alerts)
+1. Create a new Telegram group (or open an existing one).
+2. Add your newly created bot into the group.
+3. Temporarily add **`@raw_data_bot`** to the group.
+4. It will post a JSON message. Look for `"chat": { "id": -100xxxxxxxxxx }`.
+5. Copy that full negative number starting with `-100` (e.g., `-1001928374650`).
+6. Remove `@raw_data_bot` from the group.
+
+##### Option C: For Telegram Channels
+1. Create a Telegram Channel.
+2. Add your bot to the channel as an **Administrator** with permission to *Post Messages*.
+3. Post any test message into your channel, then forward that message to `@userinfobot` to retrieve the numeric channel ID (starts with `-100...`).
+
+---
+
+#### 🔌 Step 3: Add Bot Token & Chat ID to the Bot
+
+##### Method 1: Directly via the Web Dashboard (Recommended)
+1. Open your browser and navigate to the bot dashboard:
+   👉 **`http://localhost:5000/telegram`** *(or click **✈️ Telegram Settings** in the left sidebar)*.
+2. Check the box:
+   ```text
+   ☑ Enable Telegram Push Notifications
+   ```
+3. Paste your **Bot Token** into the **Bot Token** field.
+4. Paste your numeric **Chat ID** (e.g., `1523086010` or `-100...`) into the **Destination Chat ID** field.
+5. *(Optional)* Configure delivery preferences:
+   - **Disable web page link previews**: Keeps message cards compact.
+   - **Send silently**: Disables sound on mobile devices.
+6. Click **Save Telegram Settings**.
+
+##### Method 2: Via the `.env` Configuration File
+If running on a VPS or configuring before launching the server:
+1. Open the `.env` file in the project root directory.
+2. Fill in the credentials:
+   ```env
+   TELEGRAM_BOT_TOKEN="7123456789:AAHk1234567890abcdefghijklmnopqrstuv"
+   TELEGRAM_CHAT_ID="1523086010"
+   ```
+3. Save the file. When the application starts, it will automatically import and Fernet-encrypt the token.
+
+---
+
+#### 🔔 Step 4: Verify with a Test Notification
+1. On the **Telegram Settings** page in the dashboard, click the button:
+   ```text
+   🔔 Send Test Notification
+   ```
+2. Open Telegram on your phone or desktop.
+3. You will immediately receive a verification message from your bot:
+   > *🔔 Test Notification: Telegram bot integration is active and working properly!*
+4. All future listings matching your configured search criteria will now trigger real-time notification cards with photos, prices, locations, and direct Facebook Marketplace links!
 
 ---
 

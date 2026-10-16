@@ -76,4 +76,49 @@
     </div>
   </form>
 </div>
+
+<!-- Step-by-Step Instructions Card -->
+<div class="card" style="max-width: 750px; margin: 1.5rem auto; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2);">
+  <h3 style="margin-top:0; font-size:1.05rem; display:flex; align-items:center; gap:0.5rem; color:#60a5fa;">
+    <span>📖</span> How to Get Your Telegram Bot Token & Chat ID in 1 Minute
+  </h3>
+  
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:1.25rem; margin-top:1rem; font-size:0.875rem; line-height:1.5;">
+    <!-- Step 1: Bot Token -->
+    <div style="background: rgba(30, 41, 59, 0.7); padding: 1rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="font-weight:700; color:#38bdf8; margin-bottom:0.4rem;">
+        1️⃣ Get Bot Token (@BotFather)
+      </div>
+      <ol style="margin:0; padding-left:1.25rem; color:var(--text-muted);">
+        <li>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank" style="color:#60a5fa; text-decoration:underline; font-weight:600;">@BotFather</a>.</li>
+        <li>Send <code style="color:#f43f5e; background:rgba(0,0,0,0.3); padding:0.1rem 0.3rem; border-radius:3px;">/newbot</code> and follow prompts.</li>
+        <li>Choose a display name and username ending in <code style="color:#38bdf8;">bot</code>.</li>
+        <li>Copy the HTTP API token (e.g. <code style="font-size:0.75rem;">7123456789:AA...</code>).</li>
+        <li style="color:#fbbf24; margin-top:0.3rem;"><strong>Important:</strong> Click your new bot link and press <strong>START</strong> so Telegram allows it to message you!</li>
+      </ol>
+    </div>
+
+    <!-- Step 2: Chat ID -->
+    <div style="background: rgba(30, 41, 59, 0.7); padding: 1rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="font-weight:700; color:#38bdf8; margin-bottom:0.4rem;">
+        2️⃣ Get Destination Chat ID
+      </div>
+      <div style="color:var(--text-muted); margin-bottom:0.4rem;">
+        <strong>For Personal Messages:</strong>
+      </div>
+      <ol style="margin:0 0 0.5rem 0; padding-left:1.25rem; color:var(--text-muted);">
+        <li>Search for <a href="https://t.me/userinfobot" target="_blank" style="color:#60a5fa; text-decoration:underline; font-weight:600;">@userinfobot</a> on Telegram.</li>
+        <li>Send <code style="color:#f43f5e; background:rgba(0,0,0,0.3); padding:0.1rem 0.3rem; border-radius:3px;">/start</code>.</li>
+        <li>Copy the numeric <strong>Id</strong> (e.g. <code style="color:#34d399;">1523086010</code>).</li>
+      </ol>
+      <div style="color:var(--text-muted); font-size:0.8rem; border-top:1px solid rgba(255,255,255,0.08); padding-top:0.4rem;">
+        <strong>For Groups / Channels:</strong> Add your bot to the group, send a message, and use <a href="https://t.me/raw_data_bot" target="_blank" style="color:#60a5fa;">@raw_data_bot</a> to get the group ID (e.g. <code style="color:#34d399;">-1001928374650</code>).
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:1rem; padding:0.75rem 1rem; background:rgba(34, 197, 94, 0.1); border:1px solid rgba(34, 197, 94, 0.25); border-radius:0.5rem; font-size:0.85rem; color:#a7f3d0;">
+    💡 <strong>Once added:</strong> Click <strong>Save Telegram Settings</strong>, then click <strong>🔔 Send Test Notification</strong> to verify live alerts on your phone or desktop.
+  </div>
+</div>
 {% endblock %}
