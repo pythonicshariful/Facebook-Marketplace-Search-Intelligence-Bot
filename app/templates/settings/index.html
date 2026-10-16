@@ -21,6 +21,22 @@
     <form method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
+      <!-- Scraper Engine Mode -->
+      <div class="form-group" style="background: rgba(30, 41, 59, 0.4); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+        <label class="form-label" for="scraper_mode" style="font-weight: 600; color: #60a5fa;">Scraper Engine Mode</label>
+        <select id="scraper_mode" name="scraper_mode" class="form-control">
+          <option value="tampermonkey" {% if settings.scraper_mode == 'tampermonkey' %}selected{% endif %}>
+            🧩 Tampermonkey Userscript (Runs in your real browser - Zero bot detection, recommended)
+          </option>
+          <option value="selenium" {% if settings.scraper_mode == 'selenium' %}selected{% endif %}>
+            🤖 Selenium / Undetected ChromeDriver (Automated Chrome background window)
+          </option>
+        </select>
+        <div class="form-text">
+          Choose whether searches are processed by the Tampermonkey Userscript in your real browser or by automated ChromeDriver.
+        </div>
+      </div>
+
       <!-- Minimum Interval -->
       <div class="form-group">
         <label class="form-label" for="min_interval_minutes">Minimum Monitoring Interval (Minutes)</label>
@@ -96,12 +112,55 @@
         </label>
       </div>
 
+        <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+          <label class="form-label" for="tm_api_token">Tampermonkey API Bearer Token</label>
+          <input type="text" id="tm_api_token" name="tm_api_token" class="form-control" value="{{ settings.tm_api_token }}">
+          <div class="form-text">
+            Security key used by the Tampermonkey Userscript to communicate with <code>/api/tm/*</code>.
+          </div>
+        </div>
+
+        <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-top: 0.5rem;">
+          <input type="checkbox" name="tm_agent_paused" value="1" {% if settings.tm_agent_paused %}checked{% endif %}>
+          <span style="font-size:0.875rem; color:#f87171;">Emergency Pause: temporarily suspend all browser Tampermonkey search jobs</span>
+        </label>
+      </div>
+
       <div style="text-align:right; margin-top:1.5rem;">
         <button type="submit" name="action" value="save" class="btn btn-primary">
           Save Settings
         </button>
       </div>
     </form>
+  </div>
+
+  <!-- Tampermonkey Setup & Extension Card -->
+  <div class="card" style="border: 1px solid rgba(59, 130, 246, 0.4);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; margin-bottom:1rem;">
+      <h3 style="margin:0; font-size:1.15rem; color:#60a5fa; display:flex; align-items:center; gap:0.5rem;">
+        <span>🧩</span> Tampermonkey Browser Agent
+      </h3>
+      <a href="{{ url_for('tm_api.get_user_script') }}" target="_blank" class="btn btn-primary btn-sm">
+        📥 1-Click Install Script
+      </a>
+    </div>
+
+    <p style="font-size:0.875rem; color:var(--text-muted); line-height:1.5;">
+      Eliminate undetected-chromedriver detection and Facebook checkpoint blocks. The Tampermonkey userscript drives searches natively in your regular browser profile.
+    </p>
+
+    <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 1rem; margin: 1rem 0; border: 1px solid var(--border-color);">
+      <h4 style="margin:0 0 0.5rem 0; font-size:0.95rem; color:#e2e8f0;">Quick Setup in 3 Steps:</h4>
+      <ol style="margin:0; padding-left:1.2rem; font-size:0.85rem; color:#cbd5e1; line-height:1.6;">
+        <li>Install the <strong>Tampermonkey</strong> extension in Chrome, Edge, Brave, or Firefox.</li>
+        <li>Click <a href="{{ url_for('tm_api.get_user_script') }}" target="_blank" style="color:#60a5fa; font-weight:600;">📥 Install Script</a>. Tampermonkey will prompt you to install.</li>
+        <li>Open <a href="https://www.facebook.com/marketplace/" target="_blank" style="color:#60a5fa; font-weight:600;">Facebook Marketplace</a> in a browser tab. The floating agent status widget will connect automatically!</li>
+      </ol>
+    </div>
+
+    <div style="font-size:0.8rem; color:#94a3b8;">
+      Script endpoint: <code>{{ request.host_url }}api/tm/script.user.js</code>
+    </div>
   </div>
 
   <!-- Database Backups Section -->

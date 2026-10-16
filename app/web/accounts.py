@@ -29,12 +29,15 @@ def index():
     scheduler = current_app.extensions.get("scheduler")
     browser_snapshot = scheduler.browser_manager.snapshot() if scheduler else []
     open_account_ids = {item["account_id"] for item in browser_snapshot}
+    from ..services import settings_store as st
+    headless_setting = st.get(db, "headless")
 
     return render_template(
         "accounts/index.html",
         accounts=accounts,
         open_account_ids=open_account_ids,
         browser_snapshot=browser_snapshot,
+        headless_setting=headless_setting,
     )
 
 
@@ -167,6 +170,18 @@ def delete(account_id: int):
 
 # --- Manual Login / Session actions ---
 
+@bp.route("/<int:account_id>/open-browser", methods=["POST"])
+@login_required
+def open_browser(account_id: int):
+    scheduler = current_app.extensions.get("scheduler")
+    if scheduler:
+        scheduler.trigger_open_browser(account_id)
+        flash("Launching visible Chrome window for account...", "info")
+    else:
+        flash("Scheduler is not active.", "danger")
+    return redirect(url_for("accounts.index"))
+
+
 @bp.route("/<int:account_id>/open-login", methods=["POST"])
 @login_required
 def open_login(account_id: int):
@@ -211,6 +226,34 @@ def close_browser(account_id: int):
         scheduler.trigger_close_browser(account_id)
         flash("Closing browser window and releasing profile lock...", "info")
     return redirect(url_for("accounts.index"))
+
+
+@bp.route("/toggle-headless", methods=["POST"])
+@login_required
+def toggle_headless():
+    from ..services import settings_store as st
+    from ..services import activity
+    current = st.get(db, "headless")
+    new_val = not bool(current)
+    st.set_value(db, "headless", new_val)
+    db.commit()
+    scheduler = current_app.extensions.get("scheduler")
+    if new_val and scheduler:
+        scheduler.browser_manager.shutdown_all()
+    mode_str = "Headless Mode (Silent in background)" if new_val else "Visible Window Mode (Chrome displays on desktop)"
+    flash(f"Browser mode updated: {mode_str}.", "success")
+    activity.info("settings", f"Browser mode changed to {mode_str} by operator.")
+    return redirect(request.referrer or url_for("accounts.index"))
+
+
+@bp.route("/close-all-browsers", methods=["POST"])
+@login_required
+def close_all_browsers():
+    scheduler = current_app.extensions.get("scheduler")
+    if scheduler:
+        scheduler.browser_manager.shutdown_all()
+        flash("All open browser windows have been closed and profile locks released.", "info")
+    return redirect(request.referrer or url_for("accounts.index"))
 
 
 # --- Exports ---

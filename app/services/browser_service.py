@@ -19,7 +19,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+import os
+import re
+import shutil
+import subprocess
+import sys
+from typing import Callable, Iterator, Optional, Tuple
 
 from . import selectors as S
 from .page_state import PageState, classify
@@ -50,19 +55,183 @@ class FetchResult:
     html: str = ""
 
 
-def create_chrome_driver(profile_dir: str, headless: bool, page_load_timeout: int,
-                         chrome_binary: str = "", chromedriver_path: str = ""):
-    """Create a standard Selenium Chrome driver bound to a persistent profile.
+def detect_chrome_version(chrome_binary: str = "") -> Tuple[Optional[str], Optional[int]]:
+    """Detect the installed Google Chrome version and its major version integer.
 
-    Selenium Manager (bundled with Selenium >= 4.6) resolves a ChromeDriver that
-    matches the installed Chrome when ``chromedriver_path`` is empty.
+    Before launching undetected-chromedriver, discovering the installed Chrome major
+    version prevents ChromeDriver version mismatch errors (SessionNotCreatedException).
+
+    Strategies:
+    1. If chrome_binary is provided, check its file/CLI version.
+    2. On Windows: query Registry (HKCU/HKLM BLBeacon or Uninstall DisplayVersion).
+    3. On Windows: inspect standard installation paths (Program Files, LocalAppData).
+    4. Ask undetected_chromedriver.find_chrome_executable() for detected binary.
+    5. On Linux/macOS: query standard binary names with --version.
     """
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
+    full_ver: Optional[str] = None
+    major_ver: Optional[int] = None
 
-    opts = Options()
-    opts.add_argument(f"--user-data-dir={Path(profile_dir).resolve()}")
+    def _parse_major(v_str: Optional[str]) -> Optional[int]:
+        if not v_str:
+            return None
+        m = re.search(r"(\d+)(?:\.\d+)+", str(v_str))
+        if m:
+            try:
+                return int(m.group(1))
+            except ValueError:
+                pass
+        return None
+
+    def _get_win_file_version(filepath: str) -> Optional[str]:
+        if not filepath or not os.path.exists(filepath):
+            return None
+        try:
+            import ctypes
+            from ctypes import wintypes
+            size = ctypes.windll.version.GetFileVersionInfoSizeW(filepath, None)
+            if not size:
+                return None
+            res = ctypes.create_string_buffer(size)
+            if not ctypes.windll.version.GetFileVersionInfoW(filepath, None, size, res):
+                return None
+            uLen = wintypes.UINT()
+            pFixed = wintypes.LPVOID()
+            if ctypes.windll.version.VerQueryValueW(res, "\\", ctypes.byref(pFixed), ctypes.byref(uLen)):
+                class VS_FIXEDFILEINFO(ctypes.Structure):
+                    _fields_ = [
+                        ("dwSignature", wintypes.DWORD),
+                        ("dwStrucVersion", wintypes.DWORD),
+                        ("dwFileVersionMS", wintypes.DWORD),
+                        ("dwFileVersionLS", wintypes.DWORD),
+                        ("dwProductVersionMS", wintypes.DWORD),
+                        ("dwProductVersionLS", wintypes.DWORD),
+                        ("dwFileFlagsMask", wintypes.DWORD),
+                        ("dwFileFlags", wintypes.DWORD),
+                        ("dwFileOS", wintypes.DWORD),
+                        ("dwFileType", wintypes.DWORD),
+                        ("dwFileSubtype", wintypes.DWORD),
+                        ("dwFileDateMS", wintypes.DWORD),
+                        ("dwFileDateLS", wintypes.DWORD),
+                    ]
+                fixed = VS_FIXEDFILEINFO.from_address(pFixed.value)
+                ms = fixed.dwProductVersionMS
+                ls = fixed.dwProductVersionLS
+                return f"{ms >> 16}.{ms & 0xffff}.{ls >> 16}.{ls & 0xffff}"
+        except Exception:
+            pass
+        return None
+
+    def _get_cli_version(binary: str) -> Optional[str]:
+        if not binary:
+            return None
+        try:
+            out = subprocess.check_output([binary, "--version"], stderr=subprocess.STDOUT, timeout=3, text=True)
+            m = re.search(r"(\d+\.\d+\.\d+\.\d+)", out)
+            if m:
+                return m.group(1)
+        except Exception:
+            pass
+        return None
+
+    # 1. Custom binary passed explicitly
+    if chrome_binary and os.path.exists(chrome_binary):
+        if sys.platform.startswith("win"):
+            full_ver = _get_win_file_version(chrome_binary)
+        else:
+            full_ver = _get_cli_version(chrome_binary)
+        major_ver = _parse_major(full_ver)
+        if major_ver:
+            return full_ver, major_ver
+
+    # 2. Windows Registry
+    if sys.platform.startswith("win"):
+        try:
+            import winreg
+            candidates = [
+                (winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon", "version"),
+                (winreg.HKEY_LOCAL_MACHINE, r"Software\Google\Chrome\BLBeacon", "version"),
+                (winreg.HKEY_CURRENT_USER, r"Software\Chromium\BLBeacon", "version"),
+                (winreg.HKEY_LOCAL_MACHINE, r"Software\Chromium\BLBeacon", "version"),
+                (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Google Chrome", "DisplayVersion"),
+                (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Google Chrome", "DisplayVersion"),
+                (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Google Chrome", "DisplayVersion"),
+            ]
+            for root, subkey, val_name in candidates:
+                try:
+                    with winreg.OpenKey(root, subkey) as key:
+                        v, _ = winreg.QueryValueEx(key, val_name)
+                        if v:
+                            full_ver = str(v).strip()
+                            major_ver = _parse_major(full_ver)
+                            if major_ver:
+                                return full_ver, major_ver
+                except OSError:
+                    continue
+        except Exception:
+            pass
+
+    # 3. Standard Windows Installation Paths
+    if sys.platform.startswith("win"):
+        common_paths = [
+            os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), r"Google\Chrome\Application\chrome.exe"),
+            os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), r"Google\Chrome\Application\chrome.exe"),
+            os.path.join(os.environ.get("LocalAppData", ""), r"Google\Chrome\Application\chrome.exe"),
+        ]
+        for cp in common_paths:
+            if os.path.exists(cp):
+                full_ver = _get_win_file_version(cp)
+                major_ver = _parse_major(full_ver)
+                if major_ver:
+                    return full_ver, major_ver
+
+    # 4. undetected_chromedriver executable discovery fallback
+    try:
+        import undetected_chromedriver as uc
+        exe = uc.find_chrome_executable()
+        if exe and os.path.exists(exe):
+            if sys.platform.startswith("win"):
+                full_ver = _get_win_file_version(exe)
+            else:
+                full_ver = _get_cli_version(exe)
+            major_ver = _parse_major(full_ver)
+            if major_ver:
+                return full_ver, major_ver
+    except Exception:
+        pass
+
+    # 5. Non-Windows standard CLI lookups
+    if not sys.platform.startswith("win"):
+        for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+            p = shutil.which(name)
+            if p:
+                full_ver = _get_cli_version(p)
+                major_ver = _parse_major(full_ver)
+                if major_ver:
+                    return full_ver, major_ver
+
+    return full_ver, major_ver
+
+
+def create_chrome_driver(profile_dir: str, headless: bool, page_load_timeout: int,
+                         chrome_binary: str = "", chromedriver_path: str = "",
+                         version_main: Optional[int] = None):
+    """Create an Undetected ChromeDriver bound to a persistent profile.
+
+    Auto-detects the installed Chrome major version beforehand to ensure ChromeDriver
+    matches the installed browser and skips version mismatch errors.
+    """
+    import undetected_chromedriver as uc
+
+    # Detect Chrome version prior to launch to skip version mismatch errors
+    detected_full, detected_major = detect_chrome_version(chrome_binary)
+    target_major = version_main or detected_major
+    if target_major:
+        log.info("Detected Chrome %s (targeting major version %s for undetected-chromedriver)",
+                 detected_full or f"v{target_major}", target_major)
+    else:
+        log.warning("Could not auto-detect Chrome version; undetected-chromedriver will attempt default resolution")
+
+    opts = uc.ChromeOptions()
     opts.add_argument("--profile-directory=Default")
     opts.add_argument("--no-first-run")
     opts.add_argument("--no-default-browser-check")
@@ -73,12 +242,29 @@ def create_chrome_driver(profile_dir: str, headless: bool, page_load_timeout: in
         "credentials_enable_service": False,
         "profile.password_manager_enabled": False,
     })
-    if headless:
-        opts.add_argument("--headless=new")
+
     if chrome_binary:
         opts.binary_location = chrome_binary
-    service = Service(executable_path=chromedriver_path) if chromedriver_path else Service()
-    driver = webdriver.Chrome(options=opts, service=service)
+
+    driver_kwargs: dict = {
+        "options": opts,
+        "user_data_dir": str(Path(profile_dir).resolve()),
+        "headless": headless,
+        "use_subprocess": True,
+    }
+    if target_major:
+        driver_kwargs["version_main"] = target_major
+    if chrome_binary:
+        driver_kwargs["browser_executable_path"] = chrome_binary
+    if chromedriver_path:
+        driver_kwargs["driver_executable_path"] = chromedriver_path
+
+    try:
+        driver = uc.Chrome(**driver_kwargs)
+    except Exception as exc:
+        log.error("Failed to initialize undetected-chromedriver (version_main=%s): %s", target_major, exc)
+        raise
+
     driver.set_page_load_timeout(page_load_timeout)
     return driver
 
@@ -102,8 +288,8 @@ class BrowserSession:
 
     def alive(self) -> bool:
         try:
-            _ = self.driver.window_handles  # type: ignore[attr-defined]
-            return True
+            handles = self.driver.window_handles  # type: ignore[attr-defined]
+            return bool(handles)
         except Exception:
             return False
 
@@ -126,10 +312,11 @@ class BrowserManager:
     """Registry of open browser sessions, at most one per account/profile."""
 
     def __init__(self, locks_dir: str | Path, chrome_binary: str = "", chromedriver_path: str = "",
-                 driver_factory: Optional[DriverFactory] = None):
+                 driver_factory: Optional[DriverFactory] = None, version_main: Optional[int] = None):
         self.locks_dir = Path(locks_dir)
         self.chrome_binary = chrome_binary
         self.chromedriver_path = chromedriver_path
+        self.version_main = version_main
         self._factory = driver_factory
         self._sessions: dict[int, BrowserSession] = {}
         self._lock = threading.RLock()
@@ -139,7 +326,8 @@ class BrowserManager:
         if self._factory:
             return self._factory(profile_dir, headless, page_load_timeout)
         return create_chrome_driver(profile_dir, headless, page_load_timeout,
-                                    self.chrome_binary, self.chromedriver_path)
+                                    self.chrome_binary, self.chromedriver_path,
+                                    version_main=self.version_main)
 
     def open(self, account_id: int, label: str, profile_dir: str, purpose: str,
              opts: BrowserOptions, force_visible: bool = False) -> BrowserSession:
@@ -147,13 +335,24 @@ class BrowserManager:
         with self._lock:
             existing = self.get(account_id)
             if existing:
-                existing.purpose = purpose
-                existing.lock.set_owner(f"{label}:{purpose}")
-                return existing
+                desired_headless = False if force_visible else opts.headless
+                if existing.headless != desired_headless:
+                    log.info("Relaunching browser for %s: mode changed (current headless=%s, desired=%s)",
+                             label, existing.headless, desired_headless)
+                    self.close(account_id)
+                else:
+                    existing.purpose = purpose
+                    existing.lock.set_owner(f"{label}:{purpose}")
+                    return existing
             Path(profile_dir).mkdir(parents=True, exist_ok=True)
             lock = ProfileLock(profile_dir, self.locks_dir, owner=f"{label}:{purpose}")
             lock.acquire()  # raises ProfileBusyError
             try:
+                # Allow a short grace period for OS to release file locks after previous Chrome shutdown
+                for _ in range(10):
+                    if not chrome_profile_in_use(profile_dir):
+                        break
+                    time.sleep(0.2)
                 if chrome_profile_in_use(profile_dir):
                     raise ProfileBusyError(
                         "A Chrome window started outside this application is using this profile. "

@@ -13,12 +13,17 @@ from flask import (
 from flask_login import login_required
 from sqlalchemy import select
 
+import webbrowser
+from datetime import timedelta
+
 from ..db import db
-from ..models import Account, SearchConfiguration, SearchStatus
+from ..models import Account, SearchConfiguration, SearchListing, SearchStatus, TmAgent, utcnow
 from ..services import search_service
+from ..services import settings_store as st
 from ..services.account_service import ValidationError
 from ..services.filtering import CONDITION_KEYWORDS
 from ..services.marketplace_url import SORT_OPTIONS
+from sqlalchemy import func
 
 bp = Blueprint("searches", __name__, url_prefix="/searches")
 
@@ -36,12 +41,25 @@ def index():
     )
     accounts = db.scalars(select(Account).where(Account.enabled == True).order_by(Account.display_name)).all()  # noqa: E712
 
+    scraper_mode = st.get(db, "scraper_mode") or getattr(current_app.config["APP_CONFIG"], "SCRAPER_MODE", "tampermonkey")
+    cutoff = utcnow() - timedelta(seconds=45)
+    active_agent = db.scalar(select(TmAgent).where(TmAgent.last_heartbeat_at >= cutoff))
+
+    counts_map = {}
+    for s in searches:
+        total = db.scalar(select(func.count(SearchListing.id)).where(SearchListing.search_id == s.id)) or 0
+        matched = db.scalar(select(func.count(SearchListing.id)).where(SearchListing.search_id == s.id, SearchListing.matched == True)) or 0  # noqa: E712
+        counts_map[s.id] = {"total": total, "matched": matched}
+
     return render_template(
         "searches/index.html",
         searches=searches,
         accounts=accounts,
         conditions=CONDITION_KEYWORDS,
         sort_options=SORT_OPTIONS,
+        scraper_mode=scraper_mode,
+        active_agent=active_agent,
+        counts_map=counts_map,
     )
 
 
@@ -146,14 +164,46 @@ def delete(search_id: int):
     return redirect(url_for("searches.index"))
 
 
+@bp.route("/<int:search_id>/reevaluate", methods=["POST"])
+@login_required
+def reevaluate(search_id: int):
+    search = db.get(SearchConfiguration, search_id)
+    if not search:
+        flash("Search not found.", "warning")
+        return redirect(url_for("searches.index"))
+    total, matched, notified = search_service.reevaluate_listings(db, search.id, send_notifications=True)
+    db.commit()
+    msg = f"Re-evaluated {total} listings for '{search.name}': {matched} now match current criteria."
+    if notified > 0:
+        msg += f" Sent {notified} Telegram alert{'s' if notified > 1 else ''}!"
+    flash(msg, "success")
+    return redirect(request.referrer or url_for("searches.index"))
+
+
+
 @bp.route("/<int:search_id>/run-now", methods=["POST"])
 @login_required
 def run_now(search_id: int):
     scheduler = current_app.extensions.get("scheduler")
+    mode = st.get(db, "scraper_mode") or getattr(current_app.config["APP_CONFIG"], "SCRAPER_MODE", "tampermonkey")
     if scheduler:
-        ok = scheduler.trigger_search_now(search_id)
-        if ok:
-            flash("Search execution triggered immediately in background.", "success")
+        scheduler.trigger_search_now(search_id)
+        if mode == "tampermonkey":
+            cutoff = utcnow() - timedelta(seconds=45)
+            active_agent = db.scalar(select(TmAgent).where(TmAgent.last_heartbeat_at >= cutoff))
+            if not active_agent:
+                flash(
+                    "Search queued for Tampermonkey! Make sure Facebook Marketplace is open with the userscript active.",
+                    "info",
+                )
+            else:
+                flash(
+                    f"Search job sent to active browser agent ({active_agent.agent_id}). "
+                    "Check your Facebook Marketplace tab!",
+                    "success",
+                )
+        else:
+            flash("Search execution triggered in background with Chrome browser.", "success")
     return redirect(url_for("searches.index"))
 
 

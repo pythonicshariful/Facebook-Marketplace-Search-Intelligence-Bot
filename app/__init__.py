@@ -46,7 +46,7 @@ def create_app(cfg: Optional[Config] = None, start_scheduler: bool = True) -> Fl
     csrf.init_app(app)
 
     # 5. Register blueprints
-    from .web import accounts, api, auth, listings, logs, monitoring, overview, searches, settings, telegram
+    from .web import accounts, api, auth, listings, logs, monitoring, overview, searches, settings, telegram, tm_api
 
     app.register_blueprint(auth.bp)
     app.register_blueprint(overview.bp)
@@ -58,6 +58,7 @@ def create_app(cfg: Optional[Config] = None, start_scheduler: bool = True) -> Fl
     app.register_blueprint(logs.bp)
     app.register_blueprint(settings.bp)
     app.register_blueprint(api.bp)
+    app.register_blueprint(tm_api.bp)
 
     # 6. Teardown scoped session
     @app.teardown_appcontext
@@ -105,6 +106,7 @@ def create_app(cfg: Optional[Config] = None, start_scheduler: bool = True) -> Fl
         locks_dir=cfg.LOCKS_DIR,
         chrome_binary=cfg.CHROME_BINARY,
         chromedriver_path=cfg.CHROMEDRIVER_PATH,
+        version_main=getattr(cfg, "CHROME_VERSION_MAIN", 0) or None,
     )
     scheduler = SearchScheduler(cfg, browser_manager)
     app.extensions["browser_manager"] = browser_manager

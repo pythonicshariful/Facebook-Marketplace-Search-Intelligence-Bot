@@ -43,10 +43,14 @@ def index():
         .all()
     )
 
+    from ..services import settings_store as st
+    headless_setting = st.get(db, "headless")
+
     return render_template(
         "monitoring/index.html",
         browser_snapshot=browser_snapshot,
         active_executions=active_executions,
         recent_executions=recent_executions,
         running_searches=running_searches,
+        headless_setting=headless_setting,
     )

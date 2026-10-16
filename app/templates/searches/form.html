@@ -101,29 +101,29 @@
       4. Damage, Condition & Keyword Filters (Application-Side)
     </h3>
     <div class="form-group">
-      <label class="form-label" for="vehicle_condition">Vehicle Condition Preset</label>
+      <label class="form-label" for="vehicle_condition">Condition Preset (Optional)</label>
       <select id="vehicle_condition" name="vehicle_condition" class="form-control">
         {% for key, (label, kws) in conditions.items() %}
-          <option value="{{ key }}" {% if search and search.vehicle_condition == key %}selected{% elif not search and key == 'damaged' %}selected{% endif %}>
+          <option value="{{ key }}" {% if search and search.vehicle_condition == key %}selected{% elif not search and key == 'any' %}selected{% endif %}>
             {{ label }}
           </option>
         {% endfor %}
       </select>
       <div class="form-text">
-        Applies built-in heuristics (e.g. "blown engine", "damaged", "non-running", "wrecked", "salvage", "needs repair").
+        Applies built-in vehicle heuristics (e.g. "blown engine", "damaged", "salvage"). Select "Any condition" for electronics, phones, or general items.
       </div>
     </div>
 
     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1rem;">
       <div class="form-group">
         <label class="form-label" for="include_keywords">Include Keywords (One per line)</label>
-        <textarea id="include_keywords" name="include_keywords" class="form-control" rows="4" placeholder="Damaged&#10;Blown engine&#10;Non-running&#10;Needs repair&#10;Mechanic special">{{ search.include_keywords if search else 'Damaged\nBlown engine\nNon-running\nNeeds repair' }}</textarea>
-        <div class="form-text">Listing must match at least one of these keywords (if specified).</div>
+        <textarea id="include_keywords" name="include_keywords" class="form-control" rows="4" placeholder="e.g. 128GB&#10;Unlocked&#10;Damaged&#10;Display">{{ search.include_keywords if search else '' }}</textarea>
+        <div class="form-text">Listing must match at least one of these keywords (if specified). Matches in title, description, and URL.</div>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="exclude_keywords">Exclude Keywords (One per line)</label>
-        <textarea id="exclude_keywords" name="exclude_keywords" class="form-control" rows="4" placeholder="Parts only&#10;Accessories&#10;Wheels only&#10;Scam">{{ search.exclude_keywords if search else 'Parts only\nAccessories' }}</textarea>
+        <textarea id="exclude_keywords" name="exclude_keywords" class="form-control" rows="4" placeholder="e.g. Parts only&#10;Accessories&#10;Case only&#10;Scam">{{ search.exclude_keywords if search else '' }}</textarea>
         <div class="form-text">Any listing matching an exclude keyword is blocked immediately.</div>
       </div>
     </div>

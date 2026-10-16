@@ -41,6 +41,6 @@ def setup_logging(log_dir: Path, level: str = "INFO") -> None:
 
     # Quiet noisy libraries
     for noisy in ("urllib3", "selenium.webdriver.remote", "selenium.webdriver.common",
-                  "apscheduler.executors.default", "waitress.queue"):
+                  "undetected_chromedriver", "apscheduler.executors.default", "waitress.queue"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     _configured = True

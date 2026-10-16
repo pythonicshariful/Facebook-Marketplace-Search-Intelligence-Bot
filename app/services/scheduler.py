@@ -25,6 +25,7 @@ from . import job_runner
 from . import login_session
 from . import settings_store as st
 from . import telegram_service
+from . import tm_service
 from .browser_service import BrowserManager
 from ..config import Config
 from ..db import session_scope
@@ -132,7 +133,13 @@ class SearchScheduler:
         """Launch browser in background for operator to log in."""
         if not self.executor:
             return
-        self.executor.submit(self.login_service.start_login, account_id)
+        self.executor.submit(self.login_service.start_login, account_id, True)
+
+    def trigger_open_browser(self, account_id: int) -> None:
+        """Launch visible browser for operator interaction without demoting ready session."""
+        if not self.executor:
+            return
+        self.executor.submit(self.login_service.start_login, account_id, False)
 
     def trigger_confirm_login(self, account_id: int) -> None:
         """Verify session in the open login browser in background."""
@@ -224,6 +231,27 @@ class SearchScheduler:
         with self._lock:
             self._running_searches.add(search_id)
 
+        # Determine active mode: tampermonkey vs selenium
+        mode = "tampermonkey"
+        try:
+            with session_scope() as s:
+                mode = st.get(s, "scraper_mode") or getattr(self.cfg, "SCRAPER_MODE", "tampermonkey")
+        except Exception:
+            mode = getattr(self.cfg, "SCRAPER_MODE", "tampermonkey")
+
+        # 1. Tampermonkey mode: enqueue job into database queue for browser agent
+        if mode == "tampermonkey":
+            try:
+                with session_scope() as s:
+                    tm_service.enqueue_job(s, search_id, trigger=trigger, force=(trigger == "manual"))
+            except Exception as exc:
+                log.exception("Error enqueuing Tampermonkey job for search %s: %s", search_id, exc)
+            finally:
+                with self._lock:
+                    self._running_searches.discard(search_id)
+            return
+
+        # 2. Selenium mode: run headless/undetected Chrome driver in worker thread
         def _worker_wrapper():
             try:
                 job_runner.execute_search_job(search_id, self.cfg, self.browser_manager, trigger=trigger)
@@ -249,8 +277,12 @@ class SearchScheduler:
                     if sent > 0:
                         log.info("Housekeeping: redelivered %d pending Telegram notifications", sent)
 
-            # 2. Check login timeouts
-            self.login_service.check_timeouts()
+                # 2. Reap stale Tampermonkey jobs (> 3 mins)
+                tm_service.reap_stale_jobs(s)
+
+            # 3. Check login timeouts for Selenium if used
+            if getattr(self.cfg, "SCRAPER_MODE", "tampermonkey") == "selenium":
+                self.login_service.check_timeouts()
 
         except Exception as exc:
             log.warning("Housekeeping tick error: %s", exc)

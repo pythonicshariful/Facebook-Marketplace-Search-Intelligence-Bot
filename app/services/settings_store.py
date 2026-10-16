@@ -44,11 +44,18 @@ DEFAULTS: dict[str, Any] = {
     "telegram_silent": False,
     # Maintenance
     "backup_retention": 14,
+    # Tampermonkey Browser Agent
+    "tm_api_token": "fb-marketplace-tm-token-secret",
+    "tm_agent_paused": False,
+    "scraper_mode": "tampermonkey",     # tampermonkey | selenium
 }
 
 SECRET_KEYS = {"telegram_bot_token"}
 
-_CHOICES = {"dedup_scope": {"global", "per_search"}}
+_CHOICES = {
+    "dedup_scope": {"global", "per_search"},
+    "scraper_mode": {"tampermonkey", "selenium"},
+}
 _BOUNDS = {
     "min_interval_minutes": (1, 1440),
     "default_interval_minutes": (1, 1440),

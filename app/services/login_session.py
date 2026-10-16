@@ -64,21 +64,23 @@ class LoginService:
                 setattr(acc, k, v)
 
     # ------------------------------------------------------------------
-    def start_login(self, account_id: int) -> None:
+    def start_login(self, account_id: int, mark_waiting: bool = True) -> None:
         with session_scope() as s:
             acc = s.get(Account, account_id)
             if not acc:
                 return
             settings = st.get_all(s)
             label, profile = acc.display_name, str(resolve_profile_dir(self.cfg, acc))
+            was_ready = acc.session_status == SessionStatus.READY
         if self.manager.is_busy(account_id):
             self._set(account_id, message="Browser is busy with a monitoring task. Try again when it finishes.")
             return
         existing = self.manager.get(account_id)
         if existing and existing.headless:
-            self.manager.close(account_id)  # need a visible window for manual login
+            self.manager.close(account_id)  # need a visible window for manual interaction
         try:
-            session = self.manager.open(account_id, label, profile, "login", browser_options(settings),
+            purpose = "login" if mark_waiting else "interactive"
+            session = self.manager.open(account_id, label, profile, purpose, browser_options(settings),
                                         force_visible=True)
         except ProfileBusyError as exc:
             self._set(account_id, message=f"Cannot open browser: {exc}")
@@ -89,22 +91,29 @@ class LoginService:
                       error=str(exc)[:500])
             activity.error("browser", f"Chrome failed to start for {label}: {exc}", account_id=account_id)
             return
-        session.activity = "waiting for manual login"
+
+        target_url = MARKETPLACE_HOME if (was_ready and not mark_waiting) else FACEBOOK_HOME
         try:
-            session.driver.get(FACEBOOK_HOME)
+            session.driver.get(target_url)
         except Exception as exc:  # keep window open regardless
-            log.warning("Navigation to Facebook failed for %s: %s", label, exc)
-        timeout = settings["login_timeout_minutes"]
-        deadline = utcnow() + timedelta(minutes=timeout) if timeout else None
-        already = _has_login_cookie(session.driver)
-        msg = ("Browser opened. Log in manually in the Chrome window and complete any security verification, "
-               "then click 'Confirm Login'.")
-        if already:
-            msg = "Browser opened and this profile appears to be logged in already. Click 'Confirm Login' to verify."
-        if deadline:
-            msg += f" Login timeout: {timeout} min."
-        self._set(account_id, SessionStatus.WAITING_LOGIN, msg, login_started_at=utcnow(), login_deadline=deadline)
-        activity.info("account", f"Opened browser for manual login: {label}", account_id=account_id)
+            log.warning("Navigation failed for %s: %s", label, exc)
+
+        if mark_waiting:
+            session.activity = "waiting for manual login"
+            timeout = settings["login_timeout_minutes"]
+            deadline = utcnow() + timedelta(minutes=timeout) if timeout else None
+            already = _has_login_cookie(session.driver)
+            msg = ("Browser opened. Log in manually in the Chrome window and complete any security verification, "
+                   "then click 'Confirm Login'.")
+            if already:
+                msg = "Browser opened and this profile appears to be logged in already. Click 'Confirm Login' to verify."
+            if deadline:
+                msg += f" Login timeout: {timeout} min."
+            self._set(account_id, SessionStatus.WAITING_LOGIN, msg, login_started_at=utcnow(), login_deadline=deadline)
+            activity.info("account", f"Opened browser for manual login: {label}", account_id=account_id)
+        else:
+            session.activity = "interactive browser"
+            activity.info("account", f"Opened visible browser for {label}", account_id=account_id)
 
     # ------------------------------------------------------------------
     def confirm_login(self, account_id: int) -> None:
@@ -133,8 +142,12 @@ class LoginService:
             self._set(account_id, SessionStatus.READY,
                       "Session Ready. Facebook Marketplace is accessible. The login session is saved in this account's persistent profile and will be reused for future monitoring.",
                       success=True, login_deadline=None)
-            session.purpose = "idle"
             activity.info("account", f"Login confirmed for {label}: Marketplace accessible", account_id=account_id)
+            if settings.get("headless", False):
+                self.manager.close(account_id)
+                log.info("Closed visible manual login browser for %s to enable headless monitoring", label)
+            else:
+                session.purpose = "idle"
         elif res.state in NEEDS_ATTENTION:
             self._set(account_id, SessionStatus.WAITING_LOGIN,
                       f"Security challenge detected ({res.detail}). Please complete the verification in the open Chrome window. The browser remains open for troubleshooting; click 'Confirm Login / Continue' once finished.",

@@ -100,7 +100,10 @@ def _run_search(
         # 1. Evaluate account eligibility
         ctx = sel.SelectionContext(
             profile_exists=lambda a: resolve_profile_dir(cfg, a).exists(),
-            is_locked=lambda a: is_locked(resolve_profile_dir(cfg, a)),
+            is_locked=lambda a: (
+                browser_manager.is_busy(a.id) if browser_manager.is_open(a.id)
+                else is_locked(resolve_profile_dir(cfg, a))
+            ),
             browser_idle_open=lambda a: browser_manager.is_open(a.id) and not browser_manager.is_busy(a.id),
             runs_today=sel.runs_today_counter(s),
             auto_allowed=settings.get("auto_select_allowed", True),
@@ -124,7 +127,7 @@ def _run_search(
                 finished_at=now,
             )
             s.add(exec_entry)
-            activity.warning("search", f"Search '{search.name}' waiting: {res.reason}", search_id=search.id)
+            activity.warning("search", f"Search '{search.name}' waiting: {res.reason}", search_id=search.id, session=s)
             return
 
         chosen_account_id = res.account.id
@@ -207,6 +210,7 @@ def _run_search(
                         f"Search '{search.name}' halted: {account_name} got {fetch_result.state.value} ({fetch_result.detail})",
                         account_id=acc.id,
                         search_id=search.id,
+                        session=s,
                     )
                     return
 
@@ -232,6 +236,7 @@ def _run_search(
                         "browser",
                         f"Search '{search.name}' fetch failed ({fetch_result.detail})",
                         search_id=search.id,
+                        session=s,
                     )
                     return
 
@@ -244,8 +249,12 @@ def _run_search(
                 raw_listings = extractor.extract_listings(fetch_result.html)
                 exec_entry.found_count = len(raw_listings)
 
+                # Build a set of all unique URLs seen this run for stock tracking
+                seen_urls_this_run: set[str] = {item["url"] for item in raw_listings if item.get("url")}
+
                 criteria = _build_criteria(search, settings)
                 matched_items = []
+                unmatched_items = []  # track unmatched so we can still upsert for URL inventory
 
                 # Filter each listing
                 max_details = settings.get("max_detail_pages_per_run", 5) if search.fetch_details else 0
@@ -268,11 +277,14 @@ def _run_search(
 
                     if f_res.matched:
                         matched_items.append((item, f_res.summary))
+                    else:
+                        unmatched_items.append(item)
 
                 exec_entry.matched_count = len(matched_items)
 
                 # 5. Database upsert & notification queueing
                 new_count = 0
+                restocked_count = 0  # previously-seen URLs that reappear (possible re-stock)
                 notifications_to_send = []
                 scope = settings.get("dedup_scope", "global")
                 renotify_drop = settings.get("renotify_price_drop", False)
@@ -283,6 +295,9 @@ def _run_search(
                     )
                     if u_res.new_listing:
                         new_count += 1
+                    elif u_res.new_for_search:
+                        # Listing exists globally but is new for THIS search — possible re-stock
+                        restocked_count += 1
 
                     # Notification check
                     should_notify = search.notify_telegram and settings.get("telegram_enabled", False)
@@ -327,6 +342,13 @@ def _run_search(
                             if drop_notif:
                                 notifications_to_send.append((drop_notif, u_res.previous_price_cents))
 
+                # Also upsert unmatched listings so the URL inventory is always tracked per search.
+                # This lets us detect when a previously-absent URL reappears (re-stocked item).
+                for item in unmatched_items:
+                    dedup.upsert_listing(
+                        s, item, search.id, acc.id, matched=False, match_reason="not matched"
+                    )
+
                 exec_entry.new_count = new_count
                 exec_entry.status = ExecStatus.SUCCESS
                 exec_entry.finished_at = utcnow()
@@ -336,8 +358,10 @@ def _run_search(
                 search.consecutive_failures = 0
                 search.status = SearchStatus.ACTIVE
                 search.status_message = (
-                    f"Last run completed successfully: found {len(raw_listings)}, "
-                    f"matched {len(matched_items)}, new {new_count}."
+                    f"Last run completed successfully: found {len(raw_listings)} "
+                    f"({len(seen_urls_this_run)} unique URLs), "
+                    f"matched {len(matched_items)}, new {new_count}"
+                    + (f", restocked {restocked_count}" if restocked_count else "") + "."
                 )
                 search.next_run_at = utcnow() + timedelta(minutes=search.interval_minutes)
 
@@ -354,12 +378,15 @@ def _run_search(
 
                 exec_entry.notified_count = notified_count
 
+                restock_note = f", {restocked_count} possibly restocked" if restocked_count else ""
                 activity.info(
                     "search",
-                    f"Search '{search.name}' finished: {len(raw_listings)} listings seen, "
-                    f"{len(matched_items)} matched, {new_count} new, {notified_count} notified.",
+                    f"Search '{search.name}' finished: {len(raw_listings)} listings seen "
+                    f"({len(seen_urls_this_run)} unique URLs), "
+                    f"{len(matched_items)} matched, {new_count} new{restock_note}, {notified_count} notified.",
                     search_id=search.id,
                     account_id=acc.id,
+                    session=s,
                 )
 
     except ProfileBusyError as exc:

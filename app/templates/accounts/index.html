@@ -9,7 +9,18 @@
       Manage dedicated Facebook browser profiles, session statuses, and manual login flows.
     </p>
   </div>
-  <div style="display:flex; gap:0.5rem; align-items:center;">
+  <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+    <!-- Quick Headless Mode Toggle -->
+    <button type="button" class="btn {% if headless_setting %}btn-primary{% else %}btn-warning{% endif %}"
+            onclick="postAction('{{ url_for('accounts.toggle_headless') }}')"
+            title="Toggle between headless background Chrome and visible desktop windows">
+      {% if headless_setting %}🕶️ Headless: ON{% else %}🖥️ Headless: OFF (Visible){% endif %}
+    </button>
+    {% if open_account_ids %}
+      <button type="button" class="btn btn-secondary" onclick="postAction('{{ url_for('accounts.close_all_browsers') }}')" title="Close all open Chrome windows and release locks">
+        🛑 Close All ({{ open_account_ids|length }})
+      </button>
+    {% endif %}
     <button type="button" class="btn btn-outline" onclick="openModal('addAccountModal')">+ Add Account</button>
     <a href="{{ url_for('accounts.export_json') }}" class="btn btn-outline" title="Export non-sensitive JSON metadata">Export JSON</a>
     <a href="{{ url_for('accounts.export_pkl') }}" class="btn btn-outline" title="Export non-sensitive Pickle metadata">Export PKL</a>
@@ -148,31 +159,51 @@
             <!-- Actions buttons -->
             <td style="text-align:right; white-space:nowrap;">
               <div style="display:inline-flex; gap:0.35rem;">
-                {% if acc.id in open_account_ids or acc.session_status == 'waiting_login' %}
-                  <!-- Confirm Login / Continue button -->
+                {% if acc.session_status == 'waiting_login' %}
+                  <!-- Waiting manual login state -->
                   <button type="button" class="btn btn-success btn-sm" onclick="postAction('{{ url_for('accounts.confirm_login', account_id=acc.id) }}')" title="Verify that manual login is complete">
-                    Confirm Login / Continue
+                    ✓ Confirm Login
                   </button>
                   {% if acc.id in open_account_ids %}
-                    <!-- Close browser button -->
                     <button type="button" class="btn btn-secondary btn-sm" onclick="postAction('{{ url_for('accounts.close_browser', account_id=acc.id) }}')" title="Close browser window">
                       Close
                     </button>
                   {% else %}
-                    <!-- Re-open browser if closed -->
-                    <button type="button" class="btn btn-primary btn-sm" onclick="postAction('{{ url_for('accounts.open_login', account_id=acc.id) }}')" title="Reopen Chrome window">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="postAction('{{ url_for('accounts.open_login', account_id=acc.id) }}')" title="Reopen Chrome login window">
+                      Re-open Login
+                    </button>
+                  {% endif %}
+                {% elif acc.session_status == 'ready' %}
+                  <!-- Session is ready -->
+                  {% if acc.id in open_account_ids %}
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="postAction('{{ url_for('accounts.close_browser', account_id=acc.id) }}')" title="Close open browser window">
+                      Close Browser
+                    </button>
+                  {% else %}
+                    <button type="button" class="btn btn-primary btn-sm" onclick="postAction('{{ url_for('accounts.open_browser', account_id=acc.id) }}')" title="Launch visible Chrome window for manual browsing">
                       Open Browser
                     </button>
                   {% endif %}
-                {% else %}
-                  <!-- Open Browser / Login -->
-                  <button type="button" class="btn btn-primary btn-sm" onclick="postAction('{{ url_for('accounts.open_login', account_id=acc.id) }}')">
-                    Open Browser / Login
-                  </button>
-                  <!-- Verify session -->
-                  <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('accounts.verify', account_id=acc.id) }}')">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('accounts.verify', account_id=acc.id) }}')" title="Test Marketplace access">
                     Verify
                   </button>
+                {% else %}
+                  <!-- Account needs initial or re-login -->
+                  {% if acc.id in open_account_ids %}
+                    <button type="button" class="btn btn-success btn-sm" onclick="postAction('{{ url_for('accounts.confirm_login', account_id=acc.id) }}')" title="Confirm login in open window">
+                      ✓ Confirm Login
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="postAction('{{ url_for('accounts.close_browser', account_id=acc.id) }}')" title="Close browser">
+                      Close
+                    </button>
+                  {% else %}
+                    <button type="button" class="btn btn-primary btn-sm" onclick="postAction('{{ url_for('accounts.open_login', account_id=acc.id) }}')" title="Launch Chrome window to log in">
+                      Open Browser / Login
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('accounts.verify', account_id=acc.id) }}')" title="Check Marketplace access">
+                      Verify
+                    </button>
+                  {% endif %}
                 {% endif %}
 
                 <!-- Delete account button -->

@@ -15,11 +15,22 @@
 
 <!-- Primary Stats Grid -->
 <div class="stat-grid">
-  <div class="stat-card">
-    <span class="stat-label">Facebook Accounts</span>
-    <span class="stat-value">{{ available_accounts }} <span style="font-size:1.1rem; color:var(--text-muted); font-weight:normal;">/ {{ total_accounts }}</span></span>
-    <span class="stat-subtext" style="color: {% if available_accounts > 0 %}#34d399{% else %}#f87171{% endif %};">
-      {{ available_accounts }} session ready{% if attention_accounts > 0 %}, <span style="color:#f87171;">{{ attention_accounts }} needs attention</span>{% endif %}
+  <!-- Tampermonkey Agent Status Card -->
+  <div class="stat-card" style="border-left: 4px solid {% if active_tm_agent %}#22c55e{% else %}#f59e0b{% endif %};">
+    <span class="stat-label">Tampermonkey Agent</span>
+    <span class="stat-value">
+      {% if active_tm_agent %}
+        <span style="color: #22c55e; font-size:1.4rem;">Online</span>
+      {% else %}
+        <span style="color: #f59e0b; font-size:1.3rem;">Waiting</span>
+      {% endif %}
+    </span>
+    <span class="stat-subtext">
+      {% if active_tm_agent %}
+        <span style="color: #94a3b8;">{{ active_tm_agent.agent_id }} ({{ active_tm_agent.status }})</span>
+      {% else %}
+        <a href="{{ url_for('tm_api.get_user_script') }}" target="_blank" style="color: #60a5fa; text-decoration:none; font-weight:600;">📥 Install Script →</a>
+      {% endif %}
     </span>
   </div>
 
@@ -53,6 +64,33 @@
     <span class="stat-subtext">
       <a href="{{ url_for('telegram.index') }}" style="color: #60a5fa; text-decoration:none;">Configure channel →</a>
     </span>
+  </div>
+</div>
+
+<!-- Tampermonkey Quick Action Banner -->
+<div class="card" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(59, 130, 246, 0.3); margin-bottom: 1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+    <div>
+      <h3 style="margin:0 0 0.25rem 0; font-size:1.1rem; display:flex; align-items:center; gap:0.5rem;">
+        <span>🧩</span> Tampermonkey Browser Intelligence Agent
+        {% if active_tm_agent %}
+          <span class="badge badge-ready">Connected ({{ active_tm_agent.fb_user or 'FB Session' }})</span>
+        {% else %}
+          <span class="badge badge-waiting">No Browser Connected</span>
+        {% endif %}
+      </h3>
+      <p style="margin:0; font-size:0.875rem; color:var(--text-muted);">
+        Runs search queries, location filters & price ranges directly in your regular browser session without bot blocks.
+      </p>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <a href="{{ url_for('tm_api.get_user_script') }}" target="_blank" class="btn btn-primary" style="font-size:0.85rem; padding:0.45rem 0.9rem;">
+        📥 Install / Update Script
+      </a>
+      <a href="{{ url_for('settings.index') }}" class="btn btn-outline" style="font-size:0.85rem; padding:0.45rem 0.9rem;">
+        Agent Settings
+      </a>
+    </div>
   </div>
 </div>
 

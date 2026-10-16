@@ -298,3 +298,50 @@ class ActivityLog(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     account_id: Mapped[Optional[int]] = mapped_column(ForeignKey("accounts.id", ondelete="SET NULL"))
     search_id: Mapped[Optional[int]] = mapped_column(ForeignKey("search_configurations.id", ondelete="SET NULL"))
+
+
+# --------------------------------------------------------------------------
+# Tampermonkey Agent Models
+# --------------------------------------------------------------------------
+class TmJobStatus:
+    PENDING = "pending"
+    CLAIMED = "claimed"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    EXPIRED = "expired"
+
+
+class TmJob(Base):
+    __tablename__ = "tm_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    search_id: Mapped[int] = mapped_column(ForeignKey("search_configurations.id", ondelete="CASCADE"), nullable=False, index=True)
+    execution_id: Mapped[Optional[int]] = mapped_column(ForeignKey("search_executions.id", ondelete="SET NULL"), index=True)
+    status: Mapped[str] = mapped_column(String(24), default=TmJobStatus.PENDING, nullable=False, index=True)
+    agent_id: Mapped[Optional[str]] = mapped_column(String(80), index=True)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)  # JSON-encoded search parameters
+    progress_step: Mapped[Optional[str]] = mapped_column(String(120))
+    result_summary: Mapped[Optional[str]] = mapped_column(Text)
+    error: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    search: Mapped[SearchConfiguration] = relationship()
+    execution: Mapped[Optional[SearchExecution]] = relationship()
+
+
+class TmAgent(Base):
+    __tablename__ = "tm_agents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    display_name: Mapped[str] = mapped_column(String(120), default="Tampermonkey Agent", nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="idle", nullable=False)  # idle, busy, paused
+    fb_user: Mapped[Optional[str]] = mapped_column(String(120))
+    current_url: Mapped[Optional[str]] = mapped_column(String(500))
+    current_job_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tm_jobs.id", ondelete="SET NULL"))
+    last_heartbeat_at: Mapped[Optional[datetime]] = mapped_column(DateTime, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)

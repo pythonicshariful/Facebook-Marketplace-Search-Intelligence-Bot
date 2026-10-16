@@ -126,7 +126,11 @@ def evaluate(listing: dict[str, Any], c: SearchCriteria) -> FilterResult:
     title = listing.get("title") or ""
     desc = listing.get("description") or ""
     cond = listing.get("condition") or ""
-    hay = normalize_text(" ".join([title, desc, cond, listing.get("image_alt") or ""]))
+    loc = listing.get("location") or ""
+    seller = listing.get("seller_name") or ""
+    # Include title, description, condition, location, seller, image alt, and URL text
+    url_text = listing.get("url") or ""
+    hay = normalize_text(" ".join([title, desc, cond, loc, seller, listing.get("image_alt") or "", url_text]))
     reasons: list[str] = []
 
     # 1. Exclusions always win
@@ -167,10 +171,10 @@ def evaluate(listing: dict[str, Any], c: SearchCriteria) -> FilterResult:
     if c.include_keywords:
         hit = next((k for k in c.include_keywords if keyword_matches(hay, k)), None)
         if hit:
-            reasons.append(f"include keyword '{hit}'")
+            reasons.append(f"include keyword '{hit}' found")
         else:
             missing_text = True
-            reasons.append("no include keyword")
+            reasons.append("no include keyword (checked all product info: title, desc, condition, seller, location, URL)")
 
     if missing_text:
         return FilterResult(False, reasons, needs_details=not desc)

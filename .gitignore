@@ -1,14 +1,67 @@
-# Python
+# ==============================================================================
+# Facebook Marketplace Search Intelligence Bot - .gitignore
+# ==============================================================================
+
+# Python bytecode & cache
 __pycache__/
 *.py[cod]
-.venv/
-.pytest_cache/
+*$py.class
+*.so
+.Python
 
-# Secrets & runtime data (never commit)
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables & secrets (Never commit credentials)
 .env
+.env.*
+!.env.example
+
+# Local SQLite databases & runtime data
 data/
-logs/
 *.db
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite3
 *.pkl
+
+# Chrome browser profiles & session data
+profiles/
+chrome_data/
+chromedriver*.exe
+geckodriver*.exe
+
+# Logs, debug artifacts & scratch files
+logs/
+*.log
+debug_*.png
+page_*.html
+scratch/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE & Editor files
+.vscode/
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+*.vsix
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini

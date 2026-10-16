@@ -9,10 +9,26 @@
       Real-time inspectability of background tasks, open Chrome sessions, and search execution cycles.
     </p>
   </div>
-  <div>
+  <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+    <!-- Quick Headless Mode Toggle -->
+    <button type="button" class="btn {% if headless_setting %}btn-primary{% else %}btn-warning{% endif %}"
+            onclick="postAction('{{ url_for('accounts.toggle_headless') }}')"
+            title="Toggle between headless background Chrome and visible desktop windows">
+      {% if headless_setting %}🕶️ Headless: ON{% else %}🖥️ Headless: OFF (Visible){% endif %}
+    </button>
+    {% if browser_snapshot %}
+      <button type="button" class="btn btn-secondary" onclick="postAction('{{ url_for('accounts.close_all_browsers') }}')" title="Close all open Chrome windows and release profile locks">
+        🛑 Close All ({{ browser_snapshot|length }})
+      </button>
+    {% endif %}
     <button type="button" class="btn btn-outline" onclick="location.reload();">🔄 Refresh</button>
   </div>
 </div>
+
+<!-- Hidden Action Form for POST buttons -->
+<form id="genericPostForm" method="POST" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
 
 <!-- Active Browser Sessions Section -->
 <div class="card">
@@ -145,4 +161,14 @@
     <p style="color:var(--text-muted); font-size:0.9rem; margin:0; padding:1rem 0;">No execution records found.</p>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function postAction(url) {
+  const form = document.getElementById('genericPostForm');
+  form.action = url;
+  form.submit();
+}
+</script>
 {% endblock %}

@@ -38,12 +38,17 @@ class Config:
 
     CHROME_BINARY = os.getenv("CHROME_BINARY", "")
     CHROMEDRIVER_PATH = os.getenv("CHROMEDRIVER_PATH", "")
+    CHROME_VERSION_MAIN = _int("CHROME_VERSION_MAIN", 0)
 
     SCHEDULER_ENABLED = _bool("FMBOT_SCHEDULER_ENABLED", True)
     SCHEDULER_TICK_SECONDS = max(5, _int("FMBOT_SCHEDULER_TICK_SECONDS", 15))
 
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+    # Tampermonkey / Scraper mode
+    SCRAPER_MODE = os.getenv("FMBOT_SCRAPER_MODE", "tampermonkey").lower()  # tampermonkey | selenium
+    TM_API_TOKEN = os.getenv("FMBOT_TM_API_TOKEN", "fb-marketplace-tm-token-secret")
 
     # Flask / security
     WTF_CSRF_ENABLED = True

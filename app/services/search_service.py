@@ -1,17 +1,20 @@
 """Search configuration validation and lifecycle operations."""
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import settings_store as st
+from . import dedup, settings_store as st, telegram_service
 from .account_service import ValidationError
-from .filtering import CONDITION_KEYWORDS, parse_keywords
+from .filtering import CONDITION_KEYWORDS, SearchCriteria, evaluate, parse_keywords
 from .marketplace_url import SORT_OPTIONS, build_search_url, valid_slug
-from ..models import Account, SearchConfiguration, SearchStatus, utcnow
+from ..models import Account, Listing, SearchConfiguration, SearchListing, SearchStatus, utcnow
+
+log = logging.getLogger("fmbot.search_service")
 
 FIELDS = ("name", "search_terms", "make", "model", "location", "location_slug", "radius_miles", "min_price",
           "max_price", "vehicle_condition", "include_keywords", "exclude_keywords", "sort_by",
@@ -125,7 +128,82 @@ def update(session: Session, search: SearchConfiguration, form: dict) -> SearchC
         search.next_run_at = utcnow()
     elif interval_changed and search.last_run_at:
         search.next_run_at = max(utcnow(), search.last_run_at + timedelta(minutes=search.interval_minutes))
+    session.flush()
+    reevaluate_listings(session, search.id)
     return search
+
+
+def reevaluate_listings(session: Session, search_id: int, send_notifications: bool = True) -> tuple[int, int, int]:
+    """Re-evaluate all existing listings associated with search_id using current search criteria.
+    Returns (total_evaluated, matched_count, notified_count).
+    """
+    search = session.get(SearchConfiguration, search_id)
+    if not search:
+        return 0, 0, 0
+
+    settings = st.get_all(session)
+    criteria = SearchCriteria.from_search(
+        search,
+        accept_unknown_price=settings.get("notify_unknown_price", True),
+    )
+
+    links = session.scalars(
+        select(SearchListing).where(SearchListing.search_id == search_id)
+    ).all()
+
+    total = len(links)
+    matched_count = 0
+    notifications_to_send = []
+    scope = settings.get("dedup_scope", "global")
+
+    for link in links:
+        l = link.listing
+        if not l:
+            continue
+        raw = {
+            "url": l.url,
+            "title": l.title,
+            "description": l.description,
+            "condition": l.condition,
+            "location": l.location,
+            "seller_name": l.seller_name,
+            "price_text": l.price_text,
+            "price_cents": l.price_cents,
+            "image_url": l.image_url,
+        }
+        res = evaluate(raw, criteria)
+        link.matched = res.matched
+        link.match_reason = res.summary
+        if res.matched:
+            matched_count += 1
+            if send_notifications and search.notify_telegram and settings.get("telegram_enabled", False):
+                d_key = dedup.notification_key(l.id, search.id, scope, kind="new")
+                notif = dedup.create_notification_once(
+                    session,
+                    dedup_key=d_key,
+                    kind="new",
+                    listing_id=l.id,
+                    search_id=search.id,
+                    account_id=None,
+                    execution_id=None,
+                )
+                if notif:
+                    notifications_to_send.append((notif, None))
+
+    session.flush()
+
+    notified_count = 0
+    if notifications_to_send:
+        tg_client = telegram_service.build_client(session)
+        for notif, old_price in notifications_to_send:
+            try:
+                if telegram_service.deliver(session, notif, tg_client, previous_price_cents=old_price):
+                    notified_count += 1
+            except Exception as e:
+                log.warning("Failed to send telegram notification %s: %s", notif.id, e)
+        session.flush()
+
+    return total, matched_count, notified_count
 
 
 def pause(search: SearchConfiguration, message: str = "Paused by operator.") -> None:

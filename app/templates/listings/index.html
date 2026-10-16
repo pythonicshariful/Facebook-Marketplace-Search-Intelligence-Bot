@@ -1,30 +1,43 @@
 {% extends "base.html" %}
-{% block title %}Matched Listings{% endblock %}
+{% block title %}Product Listings{% endblock %}
 
 {% block content %}
 <div class="top-bar">
   <div>
-    <h1 class="page-title">Matched Listings</h1>
+    <h1 class="page-title">
+      {% if current_search %}
+        Listings for "{{ current_search.name }}"
+      {% else %}
+        All Discovered Product Listings
+      {% endif %}
+    </h1>
     <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
-      Discovered vehicles matching configured criteria and condition filters.
+      Every product URL scraped from Facebook Marketplace with full details, price, location, condition, and match status.
     </p>
   </div>
-  <div style="font-size:0.9rem; color:var(--text-muted);">
-    Total listings matching filter: <strong style="color:#fff;">{{ total_count }}</strong>
+  <div style="display:flex; align-items:center; gap:0.75rem;">
+    <button type="button" class="btn btn-outline btn-sm" onclick="copyAllUrlsOnPage()" title="Copy all listing URLs on this page to clipboard">
+      📋 Copy All URLs on Page
+    </button>
+    <div style="font-size:0.9rem; color:var(--text-muted);">
+      Showing <strong style="color:#fff;">{{ total_count }}</strong> items
+    </div>
   </div>
 </div>
 
-<!-- Filters Bar -->
-<div class="card" style="padding:1rem 1.25rem;">
+<!-- Search & Filter Controls -->
+<div class="card" style="padding:1rem 1.25rem; margin-bottom:1.25rem;">
   <form method="GET" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end;">
-    <div style="flex-grow:1; min-width:200px;">
-      <label class="form-label" for="q">Keyword Search</label>
-      <input type="text" id="q" name="q" class="form-control" value="{{ q }}" placeholder="Search title, description, location...">
+    <input type="hidden" name="matched" value="{{ matched_filter }}">
+
+    <div style="flex-grow:1; min-width:220px;">
+      <label class="form-label" for="q">Search in Products</label>
+      <input type="text" id="q" name="q" class="form-control" value="{{ q }}" placeholder="Search title, description, location, or URL...">
     </div>
 
-    <div style="min-width:220px;">
-      <label class="form-label" for="search_id">Filter by Search</label>
-      <select id="search_id" name="search_id" class="form-control">
+    <div style="min-width:240px;">
+      <label class="form-label" for="search_id">Search Box</label>
+      <select id="search_id" name="search_id" class="form-control" onchange="this.form.submit()">
         <option value="">All Searches</option>
         {% for s in all_searches %}
           <option value="{{ s.id }}" {% if current_search_id == s.id %}selected{% endif %}>
@@ -34,66 +47,127 @@
       </select>
     </div>
 
-    <div>
-      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-bottom:0.75rem;">
-        <input type="checkbox" name="matched" value="1" {% if matched_only %}checked{% endif %}>
-        <span style="font-size:0.875rem;">Matched only</span>
-      </label>
-    </div>
-
     <div style="display:flex; gap:0.5rem;">
       <button type="submit" class="btn btn-primary">Filter</button>
-      <a href="{{ url_for('listings.index') }}" class="btn btn-outline">Reset</a>
+      <a href="{{ url_for('listings.index', search_id=current_search_id) }}" class="btn btn-outline">Reset</a>
     </div>
   </form>
+
+  <!-- Filter Pills (All / Matched / Unmatched) -->
+  <div style="display:flex; gap:0.5rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-color); flex-wrap:wrap;">
+    <a href="{{ url_for('listings.index', search_id=current_search_id, q=q, matched='all') }}"
+       class="btn btn-sm {% if matched_filter == 'all' %}btn-primary{% else %}btn-outline{% endif %}">
+      🌐 All Products ({{ cnt_all }})
+    </a>
+    <a href="{{ url_for('listings.index', search_id=current_search_id, q=q, matched='1') }}"
+       class="btn btn-sm {% if matched_filter == '1' %}btn-success{% else %}btn-outline{% endif %}">
+      ✅ Matched Criteria ({{ cnt_matched }})
+    </a>
+    <a href="{{ url_for('listings.index', search_id=current_search_id, q=q, matched='0') }}"
+       class="btn btn-sm {% if matched_filter == '0' %}btn-secondary{% else %}btn-outline{% endif %}">
+      📋 Unmatched / Filtered Out ({{ cnt_unmatched }})
+    </a>
+    {% if current_search_id %}
+    <form action="{{ url_for('searches.reevaluate', search_id=current_search_id) }}" method="post" style="display:inline-block; margin-left:auto;">
+      <button type="submit" class="btn btn-sm btn-outline" style="border-color:#38bdf8; color:#38bdf8;" title="Re-check all product information against search criteria">
+        ⚡ Re-evaluate Search
+      </button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 
-<!-- Listings Cards Grid -->
+<!-- Listings Grid -->
 {% if listings %}
 <div class="listing-grid">
   {% for item in listings %}
-  <div class="listing-card">
+  {% set current_link = search_link_map.get(item.id) %}
+  <div class="listing-card" style="display:flex; flex-direction:column;">
+    <!-- Image -->
     {% if item.image_url %}
-      <img src="{{ item.image_url }}" alt="{{ item.title }}" class="listing-thumb" loading="lazy" onerror="this.src='https://placehold.co/400x250/1e293b/94a3b8?text=Vehicle+Listing';">
+      <img src="{{ item.image_url }}" alt="{{ item.title }}" class="listing-thumb" loading="lazy" onerror="this.src='https://placehold.co/400x250/1e293b/94a3b8?text=Listing';">
     {% else %}
       <div class="listing-thumb" style="display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:2rem;">
-        🚗
+        📦
       </div>
     {% endif %}
 
-    <div class="listing-body">
-      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+    <div class="listing-body" style="display:flex; flex-direction:column; flex-grow:1;">
+      <!-- Price & Badge -->
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.35rem;">
         <span class="listing-price">{{ item.price_cents|format_price }}</span>
         {% if item.price_text and item.price_text != (item.price_cents|format_price) %}
           <span style="font-size:0.75rem; color:var(--text-muted);">{{ item.price_text }}</span>
         {% endif %}
       </div>
 
-      <div class="listing-title" title="{{ item.title }}">
-        {{ item.title or 'Untitled Listing' }}
+      <!-- Title -->
+      <div class="listing-title" title="{{ item.title }}" style="font-weight:600; font-size:0.95rem; margin-bottom:0.4rem; line-height:1.3;">
+        {{ item.title or 'Marketplace Listing' }}
       </div>
 
-      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
-        📍 {{ item.location or 'Location not specified' }}
-        {% if item.mileage %}• {{ item.mileage }}{% endif %}
+      <!-- Location, Mileage, Condition -->
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem; display:flex; flex-direction:column; gap:0.2rem;">
+        <div>📍 {{ item.location or 'Location not specified' }}</div>
+        {% if item.condition %}
+          <div>🔧 Condition: <span style="color:#e2e8f0;">{{ item.condition }}</span></div>
+        {% endif %}
+        {% if item.mileage %}
+          <div>🛣 Mileage: <span style="color:#e2e8f0;">{{ item.mileage }}</span></div>
+        {% endif %}
+        {% if item.seller_name %}
+          <div>👤 Seller: <span style="color:#e2e8f0;">{{ item.seller_name }}</span></div>
+        {% endif %}
+        {% if item.description %}
+          <div style="font-size:0.75rem; color:#94a3b8; margin-top:0.25rem; max-height:48px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3;" title="{{ item.description }}">
+            📝 {{ item.description }}
+          </div>
+        {% endif %}
       </div>
 
-      <!-- Match reasons if any -->
-      {% if item.search_links %}
-        <div style="display:flex; flex-wrap:wrap; gap:0.25rem; margin-bottom:0.75rem;">
-          {% for link in item.search_links %}
-            {% if link.matched %}
-              <span class="badge badge-info" style="font-size:0.7rem;" title="{{ link.match_reason }}">
-                {{ link.search.name if link.search else 'Search' }}
-              </span>
-            {% endif %}
-          {% endfor %}
+      <!-- Match status tag -->
+      <div style="margin-bottom:0.6rem;">
+        {% if current_link %}
+          {% if current_link.matched %}
+            <span class="badge badge-ready" style="font-size:0.72rem;" title="{{ current_link.match_reason }}">
+              ✅ Matched: {{ current_link.match_reason }}
+            </span>
+          {% else %}
+            <span class="badge badge-neutral" style="font-size:0.72rem;" title="{{ current_link.match_reason }}">
+              Filtered out: {{ current_link.match_reason }}
+            </span>
+          {% endif %}
+        {% elif item.search_links %}
+          <div style="display:flex; flex-direction:column; gap:0.25rem;">
+            {% for link in item.search_links %}
+              <div>
+                <span class="badge {% if link.matched %}badge-ready{% else %}badge-neutral{% endif %}" style="font-size:0.7rem;" title="{{ link.match_reason }}">
+                  {% if link.matched %}✅{% else %}🔍{% endif %} {{ link.search.name if link.search else 'Search #' ~ link.search_id }}: {{ link.match_reason }}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Product URL Box -->
+      <div style="margin-top:auto; padding:0.5rem; background:rgba(15, 23, 42, 0.6); border-radius:6px; border:1px solid rgba(148, 163, 184, 0.15); margin-bottom:0.75rem;">
+        <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.25rem; font-weight:600; text-transform:uppercase;">Product URL</div>
+        <div style="display:flex; align-items:center; gap:0.35rem;">
+          <input type="text" readonly value="{{ item.url }}" class="product-url-input form-control form-control-sm"
+                 style="font-size:0.72rem; padding:0.25rem 0.4rem; height:auto; background:rgba(0,0,0,0.3); font-family:monospace; color:#38bdf8;"
+                 onclick="this.select();">
+          <button type="button" class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem; font-size:0.72rem; white-space:nowrap;"
+                  onclick="copyText('{{ item.url }}', this)" title="Copy URL">
+            Copy
+          </button>
         </div>
-      {% endif %}
+      </div>
 
-      <div style="margin-top:auto; display:flex; justify-content:space-between; align-items:center; padding-top:0.75rem; border-top:1px solid var(--border-color); font-size:0.75rem; color:var(--text-muted);">
+      <!-- Footer: Time & Open Link -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.6rem; border-top:1px solid var(--border-color); font-size:0.75rem; color:var(--text-muted);">
         <span>Detected {{ item.first_seen_at|format_dt('%b %d, %H:%M') }}</span>
-        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">
           Open FB ↗
         </a>
       </div>
@@ -106,7 +180,7 @@
 {% if total_pages > 1 %}
 <div style="display:flex; justify-content:center; gap:0.5rem; margin-top:2rem;">
   {% if page > 1 %}
-    <a href="{{ url_for('listings.index', page=page-1, q=q, search_id=current_search_id, matched='1' if matched_only else '0') }}" class="btn btn-outline btn-sm">
+    <a href="{{ url_for('listings.index', page=page-1, q=q, search_id=current_search_id, matched=matched_filter) }}" class="btn btn-outline btn-sm">
       ← Previous
     </a>
   {% endif %}
@@ -114,7 +188,7 @@
     Page {{ page }} of {{ total_pages }}
   </span>
   {% if page < total_pages %}
-    <a href="{{ url_for('listings.index', page=page+1, q=q, search_id=current_search_id, matched='1' if matched_only else '0') }}" class="btn btn-outline btn-sm">
+    <a href="{{ url_for('listings.index', page=page+1, q=q, search_id=current_search_id, matched=matched_filter) }}" class="btn btn-outline btn-sm">
       Next →
     </a>
   {% endif %}
@@ -124,10 +198,47 @@
 {% else %}
 <div class="card" style="text-align:center; padding:3rem 1rem;">
   <span style="font-size:2.5rem;">🔍</span>
-  <h3 style="margin:0.5rem 0 0.25rem 0;">No matching listings found</h3>
-  <p style="color:var(--text-muted); font-size:0.9rem; margin:0;">
-    Try modifying your keyword search or ensure your active monitoring searches are finding vehicles.
+  <h3 style="margin:0.5rem 0 0.25rem 0;">No listings found</h3>
+  <p style="color:var(--text-muted); font-size:0.9rem; margin:0 0 1rem 0;">
+    No products match the selected filters.
   </p>
+  {% if matched_filter != 'all' %}
+    <a href="{{ url_for('listings.index', search_id=current_search_id, matched='all') }}" class="btn btn-primary btn-sm">
+      View All Scraped Products
+    </a>
+  {% endif %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = "Copied!";
+    btn.classList.add("btn-success");
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.classList.remove("btn-success");
+    }, 1500);
+  }).catch(() => {
+    prompt("Copy this URL:", text);
+  });
+}
+
+function copyAllUrlsOnPage() {
+  const inputs = Array.from(document.querySelectorAll('.product-url-input'));
+  if (inputs.length === 0) {
+    alert("No URLs on this page to copy.");
+    return;
+  }
+  const urls = inputs.map(i => i.value).join("\n");
+  navigator.clipboard.writeText(urls).then(() => {
+    alert(`Successfully copied ${inputs.length} product URLs to your clipboard!`);
+  }).catch(() => {
+    prompt("Copy all URLs:", urls);
+  });
+}
+</script>
 {% endblock %}

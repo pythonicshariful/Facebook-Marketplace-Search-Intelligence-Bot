@@ -16,6 +16,9 @@ from ..models import (
     SearchExecution,
     SearchStatus,
     SessionStatus,
+    TmAgent,
+    TmJob,
+    TmJobStatus,
     utcnow,
 )
 from ..services import settings_store as st
@@ -126,6 +129,15 @@ def index():
         .all()
     )
 
+    # 8. Tampermonkey Agent status
+    tm_agents = db.scalars(select(TmAgent).order_by(TmAgent.last_heartbeat_at.desc())).all()
+    active_tm_agent = next(
+        (a for a in tm_agents if a.last_heartbeat_at and (now - a.last_heartbeat_at).total_seconds() < 45),
+        None,
+    )
+    pending_tm_jobs = db.scalar(select(func.count(TmJob.id)).where(TmJob.status == TmJobStatus.PENDING)) or 0
+    tm_paused = st.get(db, "tm_agent_paused")
+
     return render_template(
         "overview/index.html",
         total_accounts=total_accounts,
@@ -143,4 +155,7 @@ def index():
         recent_executions=recent_executions,
         recent_errors=recent_errors,
         running_searches=running_searches,
+        active_tm_agent=active_tm_agent,
+        pending_tm_jobs=pending_tm_jobs,
+        tm_paused=tm_paused,
     )

@@ -28,7 +28,7 @@ def init_engine(url: str, echo: bool = False) -> Engine:
     global _engine
     connect_args = {}
     if url.startswith("sqlite"):
-        connect_args = {"check_same_thread": False, "timeout": 30}
+        connect_args = {"check_same_thread": False, "timeout": 60}
     engine = create_engine(url, connect_args=connect_args, pool_pre_ping=True, echo=echo, future=True)
 
     if url.startswith("sqlite"):
@@ -37,7 +37,7 @@ def init_engine(url: str, echo: bool = False) -> Engine:
             cur = dbapi_conn.cursor()
             cur.execute("PRAGMA journal_mode=WAL")
             cur.execute("PRAGMA foreign_keys=ON")
-            cur.execute("PRAGMA busy_timeout=30000")
+            cur.execute("PRAGMA busy_timeout=60000")
             cur.execute("PRAGMA synchronous=NORMAL")
             cur.close()
 

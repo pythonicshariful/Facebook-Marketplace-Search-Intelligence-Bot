@@ -104,11 +104,13 @@ def format_listing_message(listing: Listing, search_name: str, account_label: st
         lines.append(f"🔧 Condition: {e(listing.condition)}")
     if listing.mileage:
         lines.append(f"🛣 Mileage: {e(listing.mileage)}")
+    if listing.seller_name:
+        lines.append(f"👤 Seller: {e(listing.seller_name)}")
     if listing.posted_text:
         lines.append(f"🕒 Posted: {e(listing.posted_text)}")
     lines.append(f"👁 First detected: {e(_fmt_time(listing.first_seen_at))}")
     lines.append(f"🔎 Search: {e(search_name)}")
-    lines.append(f"👤 Account: {e(account_label)}")
+    lines.append(f"👤 Bot Account: {e(account_label)}")
     lines.append("")
     lines.append(f'<a href="{e(listing.url, quote=True)}">Open listing</a>')
     return "\n".join(lines)

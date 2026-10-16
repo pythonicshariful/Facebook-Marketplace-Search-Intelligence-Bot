@@ -8,8 +8,37 @@
     <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
       Configure vehicle search criteria, damage/condition filters, scheduling intervals, and account assignments.
     </p>
+    <div style="margin-top:0.75rem; display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+      {% if scraper_mode == 'tampermonkey' %}
+        <span class="badge badge-info" style="font-size:0.8rem; padding:0.35rem 0.65rem;">
+          ⚡ Mode: Tampermonkey Userscript
+        </span>
+        {% if active_agent %}
+          <span class="badge badge-ready" style="font-size:0.8rem; padding:0.35rem 0.65rem;">
+            🟢 Agent Connected ({{ active_agent.agent_id }})
+          </span>
+        {% else %}
+          <span class="badge badge-waiting" style="font-size:0.8rem; padding:0.35rem 0.65rem;" title="Opening Facebook Marketplace in your browser will activate the agent">
+            🟡 No FB Tab Active (Clicking Run opens FB tab automatically)
+          </span>
+        {% endif %}
+        <a href="https://www.facebook.com/marketplace/" target="_blank" class="btn btn-outline btn-sm" style="font-size:0.8rem; padding:0.25rem 0.6rem;">
+          ↗ Open FB Marketplace Tab
+        </a>
+        <a href="{{ url_for('settings.index') }}" class="btn btn-secondary btn-sm" style="font-size:0.8rem; padding:0.25rem 0.6rem;">
+          ⚙️ Switch Scraper Mode
+        </a>
+      {% else %}
+        <span class="badge badge-info" style="font-size:0.8rem; padding:0.35rem 0.65rem;">
+          🤖 Mode: Selenium (Undetected ChromeDriver)
+        </span>
+        <a href="{{ url_for('settings.index') }}" class="btn btn-secondary btn-sm" style="font-size:0.8rem; padding:0.25rem 0.6rem;">
+          ⚙️ Switch Scraper Mode
+        </a>
+      {% endif %}
+    </div>
   </div>
-  <div style="display:flex; gap:0.5rem; align-items:center;">
+  <div style="display:flex; gap:0.5rem; align-items:flex-start;">
     <button type="button" class="btn btn-outline" onclick="postAction('{{ url_for('searches.seed_presets') }}')">
       ⚡ Load Default Presets
     </button>
@@ -52,6 +81,11 @@
                 {{ s.status_message }}
               </div>
             {% endif %}
+            <div style="margin-top:0.4rem;">
+              <a href="{{ url_for('listings.index', search_id=s.id, matched='all') }}" class="btn btn-outline btn-sm" style="font-size:0.75rem; padding:0.2rem 0.55rem; color:#38bdf8; border-color:rgba(56, 189, 248, 0.4);" title="View all product URLs collected for this search">
+                📦 <strong>{{ counts_map.get(s.id, {}).get('total', 0) }}</strong> Products Collected ({{ counts_map.get(s.id, {}).get('matched', 0) }} Matched) ↗
+              </a>
+            </div>
           </td>
 
           <!-- Condition & Keywords -->
@@ -145,8 +179,13 @@
           <!-- Actions -->
           <td style="text-align:right; white-space:nowrap;">
             <div style="display:inline-flex; gap:0.35rem;">
+              <!-- View Products -->
+              <a href="{{ url_for('listings.index', search_id=s.id, matched='all') }}" class="btn btn-outline btn-sm" style="color:#38bdf8; border-color:rgba(56, 189, 248, 0.4);" title="View all product URLs collected for this search">
+                👁 Products
+              </a>
+
               <!-- Run Now -->
-              <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('searches.run_now', search_id=s.id) }}')" title="Run immediately">
+              <button type="button" class="btn btn-outline btn-sm" onclick="runSearch('{{ url_for('searches.run_now', search_id=s.id) }}')" title="Run immediately">
                 ▶ Run
               </button>
 
@@ -165,6 +204,11 @@
               <a href="{{ url_for('searches.edit', search_id=s.id) }}" class="btn btn-outline btn-sm" title="Edit search configuration">
                 ✏️
               </a>
+
+              <!-- Re-evaluate -->
+              <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('searches.reevaluate', search_id=s.id) }}')" title="Re-evaluate all collected listings against current criteria">
+                ⚡
+              </button>
 
               <!-- Duplicate -->
               <button type="button" class="btn btn-outline btn-sm" onclick="postAction('{{ url_for('searches.duplicate', search_id=s.id) }}')" title="Duplicate search">
@@ -206,11 +250,22 @@
 
 {% block scripts %}
 <script>
+const SCRAPER_MODE = "{{ scraper_mode }}";
+
+function runSearch(url) {
+  if (SCRAPER_MODE === "tampermonkey") {
+    // Open Facebook Marketplace tab in user's browser immediately on click
+    window.open("https://www.facebook.com/marketplace/", "_blank");
+  }
+  postAction(url);
+}
+
 function postAction(url) {
   const form = document.getElementById('searchActionForm');
   form.action = url;
   form.submit();
 }
+
 function confirmDeleteSearch(id, name) {
   if (confirm(`Are you sure you want to delete search "${name}"? Existing discovered listings will remain in the database.`)) {
     const form = document.getElementById('searchActionForm');
